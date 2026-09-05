@@ -1,51 +1,19 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
+import { createContext, useCallback, useContext, useEffect, useMemo, type ReactNode } from 'react';
 import { invoke } from '@tauri-apps/api/core';
-import { en, ja, zhCN, zhTW, type MessageKey, type MessageVariables } from './resources';
+import { zhCN, type MessageKey, type MessageVariables } from './resources';
 
-export type AppLocale = 'zh-CN' | 'zh-TW' | 'ja' | 'en';
+// The console ships in Simplified Chinese only. The provider keeps the same
+// shape the pages already use, so `t()` call sites did not have to change.
+export type AppLocale = 'zh-CN';
 
-export const languageOptions: ReadonlyArray<{
-  value: AppLocale;
-  nativeLabel: string;
-}> = [
-  { value: 'zh-CN', nativeLabel: '简体中文' },
-  { value: 'zh-TW', nativeLabel: '繁體中文' },
-  { value: 'ja', nativeLabel: '日本語' },
-  { value: 'en', nativeLabel: 'English' },
-];
-
-const STORAGE_KEY = 'easy-cli-proxy-api.locale';
-const resources = { 'zh-CN': zhCN, 'zh-TW': zhTW, ja, en } as const;
-let currentLocale: AppLocale = 'zh-CN';
-
-export const supportedLocales: readonly AppLocale[] = ['zh-CN', 'zh-TW', 'ja', 'en'];
+const LOCALE: AppLocale = 'zh-CN';
 
 export function getCurrentLocale(): AppLocale {
-  return currentLocale;
+  return LOCALE;
 }
 
-export function normalizeLocale(value: string | null | undefined): AppLocale {
-  const normalized = value?.trim().toLowerCase() ?? '';
-  if (normalized.startsWith('en')) return 'en';
-  if (normalized.startsWith('ja')) return 'ja';
-  if (
-    normalized === 'zh-tw'
-    || normalized === 'zh-hk'
-    || normalized === 'zh-mo'
-    || normalized.startsWith('zh-hant')
-  ) return 'zh-TW';
-  return 'zh-CN';
-}
-
-function detectInitialLocale(): AppLocale {
-  if (typeof window === 'undefined') return 'zh-CN';
-  try {
-    const saved = window.localStorage.getItem(STORAGE_KEY);
-    if (saved) return normalizeLocale(saved);
-  } catch {
-    // Storage may be unavailable in a restricted WebView; use the OS language.
-  }
-  return normalizeLocale(window.navigator.languages?.[0] ?? window.navigator.language);
+export function normalizeLocale(_value: string | null | undefined): AppLocale {
+  return LOCALE;
 }
 
 function interpolate(template: string, variables?: MessageVariables): string {
@@ -55,8 +23,8 @@ function interpolate(template: string, variables?: MessageVariables): string {
   );
 }
 
-export function translate(locale: AppLocale, key: MessageKey, variables?: MessageVariables): string {
-  return interpolate(resources[locale][key] ?? zhCN[key], variables);
+export function translate(_locale: AppLocale, key: MessageKey, variables?: MessageVariables): string {
+  return interpolate(zhCN[key], variables);
 }
 
 type I18nContextValue = {
@@ -70,46 +38,35 @@ type I18nContextValue = {
 const I18nContext = createContext<I18nContextValue | null>(null);
 
 export function I18nProvider({ children }: { children: ReactNode }) {
-  const [locale, updateLocale] = useState<AppLocale>(detectInitialLocale);
-  currentLocale = locale;
-
-  const setLocale = useCallback((nextLocale: AppLocale) => {
-    updateLocale(normalizeLocale(nextLocale));
-  }, []);
-
   useEffect(() => {
-    document.documentElement.lang = locale;
+    document.documentElement.lang = LOCALE;
     document.documentElement.dir = 'ltr';
-    try {
-      window.localStorage.setItem(STORAGE_KEY, locale);
-    } catch {
-      // The in-memory locale still works when persistent storage is unavailable.
-    }
-    void invoke('set_app_locale', { locale }).catch((error) => {
+    void invoke('set_app_locale', { locale: LOCALE }).catch((error) => {
       console.warn('Failed to synchronize the app locale with the native shell', error);
     });
-  }, [locale]);
+  }, []);
 
+  const setLocale = useCallback((_nextLocale: AppLocale) => {}, []);
   const t = useCallback(
-    (key: MessageKey, variables?: MessageVariables) => translate(locale, key, variables),
-    [locale],
+    (key: MessageKey, variables?: MessageVariables) => translate(LOCALE, key, variables),
+    [],
   );
   const formatNumber = useCallback(
     (value: number, options?: Intl.NumberFormatOptions) =>
-      new Intl.NumberFormat(locale, options).format(value),
-    [locale],
+      new Intl.NumberFormat(LOCALE, options).format(value),
+    [],
   );
   const formatDate = useCallback(
     (value: Date | number | string, options?: Intl.DateTimeFormatOptions) => {
       const date = value instanceof Date ? value : new Date(value);
-      return new Intl.DateTimeFormat(locale, options).format(date);
+      return new Intl.DateTimeFormat(LOCALE, options).format(date);
     },
-    [locale],
+    [],
   );
 
   const context = useMemo<I18nContextValue>(
-    () => ({ locale, setLocale, t, formatNumber, formatDate }),
-    [formatDate, formatNumber, locale, setLocale, t],
+    () => ({ locale: LOCALE, setLocale, t, formatNumber, formatDate }),
+    [formatDate, formatNumber, setLocale, t],
   );
 
   return <I18nContext.Provider value={context}>{children}</I18nContext.Provider>;

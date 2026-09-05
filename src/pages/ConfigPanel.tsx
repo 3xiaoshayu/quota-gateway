@@ -34,7 +34,6 @@ import {
 import { useCoreRuntime, type CoreStatus } from '../coreRuntime';
 import { useI18n } from '../i18n';
 import { webUiManagementUrl } from '../services/clientAccess';
-import { ThinkingAliasesPage } from './ThinkingAliasesPage';
 
 type CoreConfigSettings = {
   apiKeys: CoreApiKey[];
@@ -78,7 +77,7 @@ type ConfigAction =
   | 'software'
   | null;
 type NoticeTone = 'success' | 'error';
-type ConfigSubpage = 'general' | 'network' | 'routing' | 'software' | 'aliases';
+type ConfigSubpage = 'general' | 'network' | 'routing' | 'software';
 type CloseBehavior = 'ask' | 'exit' | 'minimize-to-tray';
 type NetworkDraftField =
   | 'port'
@@ -982,18 +981,6 @@ export function ConfigPanelPage() {
           onClick={() => setActiveSubpage('routing')}
         >
           {t('config.tabs.routing')}
-        </button>
-        <button
-          type="button"
-          id="config-subpage-tab-aliases"
-          role="tab"
-          className={activeSubpage === 'aliases' ? 'active' : ''}
-          aria-selected={activeSubpage === 'aliases'}
-          aria-controls="config-subpage-panel-aliases"
-          tabIndex={activeSubpage === 'aliases' ? 0 : -1}
-          onClick={() => setActiveSubpage('aliases')}
-        >
-          {t('app.nav.thinkingAliases')}
         </button>
         <button
           type="button"
@@ -2071,16 +2058,7 @@ export function ConfigPanelPage() {
             </div>
           </section>
         </div>
-      ) : (
-        <div
-          className="config-subpage-panel"
-          id="config-subpage-panel-aliases"
-          role="tabpanel"
-          aria-labelledby="config-subpage-tab-aliases"
-        >
-          <ThinkingAliasesPage />
-        </div>
-      )}
+      ) : null}
 
       {addDialogOpen ? (
         <div className="config-dialog-backdrop" onMouseDown={(event) => {

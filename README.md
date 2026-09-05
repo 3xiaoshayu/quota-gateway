@@ -1,159 +1,41 @@
-<p align="center">
-  <strong>English</strong> |
-  <a href="README.zh-CN.md">简体中文</a> |
-  <a href="README.ja.md">日本語</a>
-</p>
+# Quota Gateway
 
-<p align="center">
-  <img src="src/assets/logo.jpg" width="112" alt="EasyCLIProxyAPI Logo">
-</p>
+把 Codex、Claude、Antigravity 的订阅账号变成本机 API，再一键接给 Codex、Claude Code、Claude Desktop、OpenCode、ZCode 这些智能体。Windows 桌面程序，Tauri 2 + React，内核是 [CLIProxyAPI](https://github.com/router-for-me/CLIProxyAPI)。
 
-<h1 align="center">EasyCLIProxyAPI</h1>
+这是 [EasyCLIProxyAPI](https://github.com/router-for-me/EasyCLIProxyAPI) 的私人精简分支。上游没有声明开源许可证（GitHub API 里 `license` 为空），所以这个仓库只作私有备份和自己使用：**不要设为公开，不发布、不分发安装包**。若上游日后加上许可证，再按其条款处理。
 
-<p align="center">
-  A portable desktop console for CLIProxyAPI.<br>
-  Our goal is to make tokens free—as in freedom.
-</p>
+## 只留四页
 
-## Overview
+| 页面 | 做什么 |
+| --- | --- |
+| 首页 | 启动 / 停止 / 重启内核；OpenAI、Claude、Gemini 三种兼容地址和第一把本机 API Key，点一下复制 |
+| OAuth | Codex / Claude / Antigravity 网页授权；认证文件的启用、停用、上传、删除；每个账号的额度 |
+| 智能体配置 | 检测本机的 Codex、Claude Code、Claude Desktop、OpenCode、ZCode，选模型、写配置、启动 |
+| 高级设置 | 端口、局域网、代理、路由策略、重试、日志、开机自启、关闭行为 |
 
-EasyCLIProxyAPI is a graphical desktop management tool built on
-[CLIProxyAPI](https://github.com/router-for-me/CLIProxyAPI). It brings core lifecycle management,
-OAuth authorization, API provider aggregation, protocol conversion, credential management,
-quota inspection, usage records, model aliases, and agent client configuration into one interface.
+## 相比上游删掉的
 
-The application is built with Tauri, React, and Rust. It can carry a matching CLIProxyAPI core
-archive, making first-time setup and offline installation easier.
+新手模式、版本管理与自动更新、API 接入（API Key 上游聚合）、使用记录与计费、Codex 会话管理、模型别名页、Kimi / xAI 登录、OpenClaw / Hermes / Pi / Kimi Code / Grok Build / DeepSeek Harness 智能体、多语言、日间主题、联系我们 / 赞助入口、GitHub 发布流水线。
 
-## Sponsor
+内核仍然从 `cpa-core/` 里随包附带的压缩包安装，不再联网检查新版本。
 
-[![https://go.apimart.ai/gh-easycliproxyapi](./assets/apimart-en.png)](https://go.apimart.ai/gh-easycliproxyapi)
+## 和 Quota Switcher 的分工
 
-Thanks to APIMart for sponsoring this project!
+[Quota Switcher](https://github.com/3xiaoshayu/quota-switcher) 管的是**官方客户端**：把账号写进官方 Codex / Cursor / Antigravity IDE，看额度、手动切号。Quota Gateway 管的是**API**：把同一批订阅账号挂在本机 `127.0.0.1:8318` 上，给命令行智能体用。两边界面用同一套深色设计，可以一起开。
 
-APIMart is a low-cost API platform for AI image & video generation — GPT-Image-2 from $0.006/image, 160+ images per dollar. One async API covers both image and video: submit a task, get an ID, fetch results via polling or callback. Batch tens of thousands of images without timeouts, switch models without changing code. Pay-as-you-go with no monthly fee — [sign up here](https://go.apimart.ai/gh-easycliproxyapi) to get started.
+默认端口是 8318，和原版 EasyCLIProxyAPI 的 8317 错开，过渡期两个都能跑。
 
-## Feature Tour
+## 开发
 
-### Home dashboard and local API endpoints
+```powershell
+bun install
+bun run check          # tsc
+bun test               # 前端单测
+cd src-tauri; cargo test; cd ..
+.\build.ps1            # 编译并整理到 bin-work\
+.\run.ps1              # 运行 bin-work\Quota Gateway.exe
+```
 
-![Home dashboard and local API endpoints](docs/screenshots/en/1.png)
+`build.ps1` 会把 `cpa-core\CLIProxyAPI_<版本>_windows_amd64.zip` 随包放进 `bin-work\cpa-core\`（版本号见 `core-version.txt`）；本地没有这个压缩包时从 GitHub Releases 下载一次并校验 SHA-256。
 
-The Home page provides a quick overview of the local proxy runtime and ready-to-use API endpoints:
-
-- Start, stop, restart, and refresh the CLIProxyAPI core.
-- View installation state, runtime state, process ID, and listening port.
-- Copy ready-to-use OpenAI, Claude, and Gemini-compatible API endpoints.
-- Check local connectivity and the application/core version at a glance.
-
-Core installation, version comparison, and offline installation are available from the
-**Version Management** page. You can switch between official GitHub, GitCode, and GitHub
-mirror proxies or add custom HTTPS mirror prefixes; application and core updates prefer the selected
-channel and fall back automatically.
-
-### OAuth account authorization
-
-![OAuth account authorization](docs/screenshots/en/2.png)
-
-The OAuth page centralizes browser-based authorization for supported providers:
-
-- Codex OAuth
-- Claude OAuth
-- Antigravity OAuth
-- Kimi OAuth
-- xAI OAuth
-
-EasyCLIProxyAPI opens the authorization page in the browser and supports completing the callback
-flow when an automatic redirect is unavailable.
-
-### API provider aggregation
-
-![API provider aggregation](docs/screenshots/en/3.png)
-
-The provider workspace manages upstream API credentials and endpoints by protocol or provider:
-
-- Codex
-- OpenAI-compatible providers
-- DeepSeek
-- Claude
-- Gemini
-
-You can add multiple connections, search existing entries, refresh provider state, and use them
-through the unified local CLIProxyAPI endpoint. Requests and responses can be converted between
-supported OpenAI, Claude, Gemini, and compatible formats.
-
-### Usage history and token analytics
-
-![Usage history and token analytics](docs/screenshots/en/4.png)
-
-The Usage page helps you understand local request activity and token consumption:
-
-- Review request totals, token counts, success rate, throughput, cache hit rate, and estimated cost.
-- Filter usage by time, model, provider, source, key, and result.
-- Inspect request/token trends and input, output, reasoning, and cache usage.
-- Browse request details, analysis views, and price statistics.
-- Collect through CPA's real-time usage subscription with a durable local inbox and automatic HTTP fallback.
-- Upgrade legacy usage databases once at startup after saving a backup under `usage-records/backups`.
-
-### Agent client configuration
-
-![Agent client configuration](docs/screenshots/en/5.png)
-
-The Agents page detects installed desktop and CLI clients and helps connect them to the local
-proxy. Supported clients include:
-
-- Claude Code
-- Claude Desktop
-- Codex
-- OpenCode
-- OpenClaw
-- Hermes Agent
-- Pi (with the CLIProxyAPI provider extension)
-- ZCode
-- Kimi Code
-- Grok Build
-
-For supported clients, the application can synchronize the available model catalog, select a
-default model, back up the original configuration before applying managed settings, and restore the
-previous configuration.
-
-## Additional Capabilities
-
-- Manage core settings, API keys, remote management credentials, and routing strategy.
-- Create client-visible model aliases and map them to provider models and reasoning levels.
-- Upload, download, inspect, and manage authentication files.
-- Review provider quotas and account availability.
-- Keep the application available from the macOS menu bar or Windows system tray.
-
-## Quick Start
-
-1. Download the package for your operating system from
-   [GitHub Releases](https://github.com/router-for-me/EasyCLIProxyAPI/releases/latest).
-2. Extract the Windows or Linux archive, or open the macOS DMG.
-3. Launch EasyCLIProxyAPI.
-4. Open **Version Management** and install the bundled or latest CLIProxyAPI core.
-5. Return to **Home**, start the core, then copy the required local endpoint or configure an OAuth/API provider.
-
-## Upgrading
-
-Every Windows release publishes both the complete ZIP and the legacy `update` ZIP. This keeps in-app updates available to older clients that have not migrated yet, while newer clients use the complete package so the bundled core can be updated too.
-
-Current Windows, Linux, and macOS release packages support in-app automatic updates. Linux replaces the portable application files while preserving runtime data, and macOS replaces the signed application bundle. Each platform waits for the new version to confirm a successful launch and rolls back automatically if startup fails. The installation directory must be writable by the current user.
-
-Existing Linux and macOS installations need one manual upgrade to a release that includes the cross-platform auto-update marker. In-app updates are available after that release has been launched once.
-
-If you are running v0.2.5 or earlier, perform one manual migration: exit EasyCLIProxyAPI, download the latest complete Windows ZIP for your architecture, then copy the contents of its top-level directory over the existing installation directory. Do not delete the existing directory first; user data such as `config.toml`, `oauth`, and `cpa-core/config.yaml` will remain in place. After launching the new version, later releases can use in-app automatic updates.
-
-## Supported Platforms
-
-GitHub Actions builds the following release packages:
-
-| Operating System | Architecture | Package |
-| --- | --- | --- |
-| Windows | amd64, aarch64 | ZIP |
-| macOS | amd64, aarch64 | DMG |
-| Linux | amd64, aarch64 | TAR.GZ |
-
-## Related Project
-
-- [CLIProxyAPI](https://github.com/router-for-me/CLIProxyAPI) — the proxy core managed by this application.
+配置和账号文件都放在可执行文件旁边的 `cpa-core\` 里，和原版互不影响。

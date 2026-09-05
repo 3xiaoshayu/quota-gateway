@@ -91,7 +91,7 @@ fn core_config_view_exposes_api_key_metadata_for_the_webview() {
     assert_eq!(view["loggingToFile"], false);
     assert_eq!(view["logsMaxTotalSizeMb"], 0);
     assert_eq!(view["errorLogsMaxFiles"], 10);
-    assert_eq!(view["usageStatisticsEnabled"], true);
+    assert_eq!(view["usageStatisticsEnabled"], false);
     assert_eq!(view["redisUsageQueueRetentionSeconds"], 60);
     assert_eq!(view["requestLog"], false);
     assert!(view.get("managementSecretKey").is_none());
@@ -496,7 +496,7 @@ fn runtime_network_patch_preserves_comments_and_other_settings() {
 #[test]
 fn runtime_network_patch_skips_unchanged_yaml() {
     let config = GuiConfigFile::default();
-    let input = "host: 127.0.0.1\nport: 8317\n";
+    let input = "host: 127.0.0.1\nport: 8318\n";
 
     assert!(patch_core_network_yaml(input, &config).unwrap().is_none());
 }
@@ -860,6 +860,7 @@ fn core_config_reads_logging_settings_and_applies_defaults() {
         DEFAULT_LOGS_MAX_TOTAL_SIZE_MB
     );
     assert_eq!(defaults.error_logs_max_files, DEFAULT_ERROR_LOGS_MAX_FILES);
+    // The core's own yaml default; the GUI default (GuiConfigFile) is false.
     assert!(defaults.usage_statistics_enabled);
     assert_eq!(
         defaults.redis_usage_queue_retention_seconds,
@@ -1244,7 +1245,7 @@ fn startup_merge_without_current_config_uses_gui_defaults() {
         document["host"],
         serde_norway::Value::String("127.0.0.1".to_string())
     );
-    assert_eq!(document["port"], serde_norway::to_value(8317_u16).unwrap());
+    assert_eq!(document["port"], serde_norway::to_value(8318_u16).unwrap());
     assert_eq!(document["debug"], serde_norway::Value::Bool(false));
     assert_eq!(document["api-keys"][0], DEFAULT_API_KEY, "{merged}");
     assert_eq!(document["plugins"]["enabled"], false);
@@ -1253,7 +1254,7 @@ fn startup_merge_without_current_config_uses_gui_defaults() {
     assert_eq!(document["logging-to-file"], false);
     assert_eq!(document["logs-max-total-size-mb"], 0);
     assert_eq!(document["error-logs-max-files"], 10);
-    assert_eq!(document["usage-statistics-enabled"], true);
+    assert_eq!(document["usage-statistics-enabled"], false);
     assert_eq!(document["redis-usage-queue-retention-seconds"], 60);
     assert_eq!(document["request-log"], false);
     assert_eq!(

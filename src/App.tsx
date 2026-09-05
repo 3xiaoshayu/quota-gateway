@@ -3,64 +3,27 @@ import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
 import {
   Bot,
-  Check,
-  ChevronUp,
-  ExternalLink,
-  History,
   House,
-  Languages,
   LogIn,
-  MessageCircle,
-  Network,
-  PackageOpen,
   ServerCog,
   Settings,
-  Sparkles,
   X,
 } from 'lucide-react';
-import appLogo from './assets/logo.jpg';
+import appLogo from './assets/logo.png';
 import { CoreRuntimeProvider, useCoreRuntime } from './coreRuntime';
-import { CoreUpdateProvider, useCoreUpdate } from './coreUpdate';
 import { ConfigPanelPage } from './pages/ConfigPanel';
-import { ApiAccessPage } from './pages/ApiAccessPage';
 import { KernelPage } from './pages/Kernel';
-import { VersionManagementPage } from './pages/VersionManagementPage';
 import { OAuthManagementPage } from './pages/ManagementPages';
 import { AgentsPage } from './pages/AgentsPage';
-import { EasyModePage } from './pages/EasyModePage';
-import { UsageRecordsPage } from './pages/UsageRecordsPage';
-import { languageOptions, useI18n } from './i18n';
-import { AppUpdateDialog, AppUpdateProvider, useAppUpdate } from './appUpdate';
-import { appUpdateIndicatorState } from './appUpdateModel';
+import { useI18n } from './i18n';
 import { canOpenAppPage, isAlwaysAvailablePage } from './navigation';
-import { detectInitialTheme, saveTheme, type AppTheme } from './theme';
-
-const CONTACT_URL = 'https://qm.qq.com/q/3queDaIG';
 
 const pages = [
-  {
-    id: 'easy',
-    labelKey: 'app.nav.easy',
-    icon: Sparkles,
-    component: HomePage,
-  },
   {
     id: 'home',
     labelKey: 'app.nav.home',
     icon: House,
     component: HomePage,
-  },
-  {
-    id: 'versions',
-    labelKey: 'app.nav.versions',
-    icon: PackageOpen,
-    component: VersionManagementPageWrapper,
-  },
-  {
-    id: 'config',
-    labelKey: 'app.nav.config',
-    icon: Settings,
-    component: ConfigPanelPage,
   },
   {
     id: 'oauth',
@@ -69,22 +32,16 @@ const pages = [
     component: OAuthManagementPage,
   },
   {
-    id: 'api',
-    labelKey: 'app.nav.api',
-    icon: Network,
-    component: ApiAccessPage,
-  },
-  {
-    id: 'usage-records',
-    labelKey: 'app.nav.usageRecords',
-    icon: History,
-    component: UsageRecordsPage,
-  },
-  {
     id: 'agents',
     labelKey: 'app.nav.agents',
     icon: Bot,
     component: AgentsPage,
+  },
+  {
+    id: 'config',
+    labelKey: 'app.nav.config',
+    icon: Settings,
+    component: ConfigPanelPage,
   },
 ] as const;
 
@@ -103,79 +60,32 @@ type GuiSettings = {
 };
 
 function HomePage() {
-  return <KernelPage view="home" />;
-}
-
-function VersionManagementPageWrapper() {
-  return <VersionManagementPage />;
+  return <KernelPage />;
 }
 
 function App() {
   return (
-    <AppUpdateProvider>
-      <CoreRuntimeProvider>
-        <CoreUpdateProvider>
-          <AppContent />
-        </CoreUpdateProvider>
-      </CoreRuntimeProvider>
-    </AppUpdateProvider>
+    <CoreRuntimeProvider>
+      <AppContent />
+    </CoreRuntimeProvider>
   );
 }
 
 function AppContent() {
-  const { locale, setLocale, t } = useI18n();
-  const { info: appUpdateInfo, hasUpdate, processing: appUpdateProcessing } = useAppUpdate();
-  const { latest: coreLatest, hasUpdate: coreHasUpdate } = useCoreUpdate();
+  const { t } = useI18n();
   const [active, setActive] = useState<PageId>('home');
-  const [languageMenuOpen, setLanguageMenuOpen] = useState(false);
-  const [theme, setTheme] = useState<AppTheme>(detectInitialTheme);
   const [windowsClosePrompt, setWindowsClosePrompt] = useState<WindowsClosePrompt | null>(null);
   const closeDialogRef = useRef<HTMLElement>(null);
-  const languageMenuRef = useRef<HTMLDivElement>(null);
-  const languageButtonRef = useRef<HTMLButtonElement>(null);
   const { status } = useCoreRuntime();
   const coreRunning = Boolean(status?.running);
   const activePage = pages.find((page) => page.id === active) ?? pages[0];
   const ActivePage = activePage.component;
-  const selectedLanguage = languageOptions.find((option) => option.value === locale)
-    ?? languageOptions[0];
-  const availableUpdateLabel = [
-    hasUpdate
-      ? t('appUpdate.badgeAvailable', { version: appUpdateInfo?.latestVersion ?? '' })
-      : '',
-    coreHasUpdate
-      ? `${t('kernel.versions.coreCardTitle')}: ${t('kernel.update.available')} ${coreLatest?.version ?? ''}`.trim()
-      : '',
-  ].filter(Boolean).join(' · ');
-  useEffect(() => {
-    saveTheme(theme);
-  }, [theme]);
 
   useEffect(() => {
     if (!canOpenAppPage(active, coreRunning)) {
       setActive('home');
     }
   }, [active, coreRunning]);
-
-  useEffect(() => {
-    if (!languageMenuOpen) return undefined;
-    const closeFromOutside = (event: PointerEvent) => {
-      if (!languageMenuRef.current?.contains(event.target as Node)) {
-        setLanguageMenuOpen(false);
-      }
-    };
-    const closeFromKeyboard = (event: KeyboardEvent) => {
-      if (event.key !== 'Escape') return;
-      setLanguageMenuOpen(false);
-      languageButtonRef.current?.focus();
-    };
-    document.addEventListener('pointerdown', closeFromOutside);
-    document.addEventListener('keydown', closeFromKeyboard);
-    return () => {
-      document.removeEventListener('pointerdown', closeFromOutside);
-      document.removeEventListener('keydown', closeFromKeyboard);
-    };
-  }, [languageMenuOpen]);
 
   useEffect(() => {
     let disposed = false;
@@ -239,14 +149,6 @@ function AppContent() {
     setActive(pageId);
   };
 
-  const openContact = async () => {
-    try {
-      await invoke('open_external_url', { url: CONTACT_URL });
-    } catch (error) {
-      console.error('打开联系我们链接失败', error);
-    }
-  };
-
   const resolveWindowsCloseRequest = async (
     action: WindowsCloseAction,
     remember = windowsClosePrompt?.rememberChoice ?? false,
@@ -283,24 +185,20 @@ function AppContent() {
 
   return (
     <>
-      <div className={`app-shell${active === "easy" ? " app-shell-easy-mode" : ""}`}>
-        {active !== "easy" ? (
-          <aside className="sidebar">
-          <div className="sidebar-brand" title="CLI Proxy API GUI">
+      <div className="app-shell">
+        <aside className="sidebar">
+          <div className="sidebar-brand" title={t('app.desktopConsole')}>
             <img src={appLogo} alt="" className="brand-mark brand-logo" />
             <div>
-              <strong>EasyCLIProxyAPI</strong>
+              <strong>{t('app.productName')}</strong>
               <span>{t('app.desktopConsole')}</span>
             </div>
           </div>
 
           <nav className="nav-section" aria-label={t('app.navigation')}>
-            {pages.filter((page) => page.id !== 'easy').map((page) => {
+            {pages.map((page) => {
               const Icon = page.icon;
               const locked = !canOpenAppPage(page.id, coreRunning);
-              const updateIndicator = page.id === 'versions'
-                ? appUpdateIndicatorState(hasUpdate, coreHasUpdate, appUpdateProcessing)
-                : null;
               return (
                 <button
                   key={page.id}
@@ -317,130 +215,16 @@ function AppContent() {
                 >
                   <Icon size={17} aria-hidden="true" />
                   <span>{t(page.labelKey)}</span>
-                  {updateIndicator ? (
-                    <i
-                      className={`nav-update-indicator ${updateIndicator}`}
-                      title={updateIndicator === 'processing'
-                        ? t('appUpdate.progressTitle')
-                        : availableUpdateLabel}
-                      aria-label={updateIndicator === 'processing'
-                        ? t('appUpdate.progressTitle')
-                        : availableUpdateLabel}
-                    />
-                  ) : null}
                 </button>
               );
             })}
           </nav>
-
-          <div className="sidebar-bottom">
-            <button
-              type="button"
-              className="sidebar-easy-entry"
-              onClick={() => select('easy')}
-            >
-              <span>{t('app.nav.easy')}</span>
-            </button>
-            <div
-              className="sidebar-theme-selector"
-              role="group"
-              aria-label={`${t('app.theme.light')} / ${t('app.theme.dark')}`}
-            >
-              <button
-                type="button"
-                className={theme === 'light' ? 'active' : ''}
-                aria-pressed={theme === 'light'}
-                title={t('app.theme.switchToLight')}
-                onClick={() => setTheme('light')}
-              >
-                {t('app.theme.light')}
-              </button>
-              <button
-                type="button"
-                className={theme === 'dark' ? 'active' : ''}
-                aria-pressed={theme === 'dark'}
-                title={t('app.theme.switchToDark')}
-                onClick={() => setTheme('dark')}
-              >
-                {t('app.theme.dark')}
-              </button>
-            </div>
-            <div ref={languageMenuRef} className="sidebar-language">
-              <button
-                ref={languageButtonRef}
-                type="button"
-                className="sidebar-language-trigger"
-                aria-label={t('app.language')}
-                aria-haspopup="listbox"
-                aria-expanded={languageMenuOpen}
-                aria-controls="sidebar-language-list"
-                onClick={() => setLanguageMenuOpen((open) => !open)}
-              >
-                <Languages size={16} aria-hidden="true" />
-                <span lang={selectedLanguage.value}>{selectedLanguage.nativeLabel}</span>
-                <ChevronUp
-                  size={14}
-                  aria-hidden="true"
-                  className={languageMenuOpen ? 'expanded' : ''}
-                />
-              </button>
-              {languageMenuOpen ? (
-                <div
-                  id="sidebar-language-list"
-                  className="sidebar-language-list"
-                  role="listbox"
-                  aria-label={t('app.language')}
-                >
-                  {languageOptions.map((option) => {
-                    const selected = option.value === locale;
-                    return (
-                      <button
-                        key={option.value}
-                        type="button"
-                        className={selected ? 'selected' : ''}
-                        role="option"
-                        aria-selected={selected}
-                        onClick={() => {
-                          setLocale(option.value);
-                          setLanguageMenuOpen(false);
-                        }}
-                      >
-                        <span lang={option.value}>{option.nativeLabel}</span>
-                        {selected ? <Check size={14} aria-hidden="true" /> : null}
-                      </button>
-                    );
-                  })}
-                </div>
-              ) : null}
-            </div>
-            <button
-              type="button"
-              className="sidebar-contact"
-              title={t('app.contact.title')}
-              onClick={() => void openContact()}
-            >
-              <MessageCircle size={16} aria-hidden="true" />
-              <span>{t('app.contact.label')}</span>
-              <ExternalLink size={13} aria-hidden="true" />
-            </button>
-          </div>
-          </aside>
-        ) : null}
+        </aside>
 
         <div className="workspace">
           <main className="content">
             {isAlwaysAvailablePage(activePage.id) || coreRunning ? (
-              activePage.id === 'easy' ? (
-                <EasyModePage
-                  onExit={() => select('home')}
-                  theme={theme}
-                  setTheme={setTheme}
-                  locale={locale}
-                  setLocale={setLocale}
-                />
-              ) : (
-                <ActivePage />
-              )
+              <ActivePage />
             ) : (
               <CoreLockedPage />
             )}
@@ -528,8 +312,6 @@ function AppContent() {
           </section>
         </div>
       ) : null}
-
-      <AppUpdateDialog />
     </>
   );
 }

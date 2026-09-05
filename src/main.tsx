@@ -3,10 +3,11 @@ import { createRoot } from 'react-dom/client';
 import { AppErrorBoundary } from './AppErrorBoundary';
 import App from './App';
 import { I18nProvider } from './i18n';
-import { applyTheme, detectInitialTheme } from './theme';
+import { applyTheme } from './theme';
 import './styles.css';
+import './theme-quota.css';
 
-applyTheme(detectInitialTheme());
+applyTheme();
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>

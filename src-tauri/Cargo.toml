@@ -1,9 +1,9 @@
 [package]
-name = "cpa-gui"
+name = "quota-gateway"
 # Single source of truth for the desktop app version.
-version = "0.2.71"
-description = "CPA desktop management shell"
-authors = ["lzt404"]
+version = "0.1.0"
+description = "Quota Gateway: turn Codex, Claude, and Antigravity subscriptions into a local API for coding agents"
+authors = ["WangJin", "lzt404"]
 edition = "2021"
 
 [build-dependencies]

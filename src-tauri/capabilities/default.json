@@ -1,9 +1,10 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
-  "description": "Default permissions for the main EasyCLIProxyAPI window.",
+  "description": "Default permissions for the main Quota Gateway window.",
   "windows": ["main"],
   "permissions": [
+    "core:app:allow-version",
     "core:event:allow-listen",
     "core:event:allow-unlisten",
     "core:window:allow-set-theme",

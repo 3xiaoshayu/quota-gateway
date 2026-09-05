@@ -226,26 +226,26 @@ pub(crate) fn windows_tray_presentation(
     let tooltip = if busy {
         locale_text(
             locale,
-            "EasyCLIProxyAPI · 内核处理中",
-            "EasyCLIProxyAPI · Core working",
+            "Quota Gateway · 内核处理中",
+            "Quota Gateway · Core working",
         )
     } else if !status.installed {
         locale_text(
             locale,
-            "EasyCLIProxyAPI · 内核未安装",
-            "EasyCLIProxyAPI · Core not installed",
+            "Quota Gateway · 内核未安装",
+            "Quota Gateway · Core not installed",
         )
     } else if status.running {
         locale_text(
             locale,
-            "EasyCLIProxyAPI · 内核运行中",
-            "EasyCLIProxyAPI · Core running",
+            "Quota Gateway · 内核运行中",
+            "Quota Gateway · Core running",
         )
     } else {
         locale_text(
             locale,
-            "EasyCLIProxyAPI · 内核已停止",
-            "EasyCLIProxyAPI · Core stopped",
+            "Quota Gateway · 内核已停止",
+            "Quota Gateway · Core stopped",
         )
     };
 
@@ -439,8 +439,8 @@ pub(crate) fn show_windows_tray_action_error(app_handle: &tauri::AppHandle, erro
     if let Some(tray) = app_handle.tray_by_id(WINDOWS_TRAY_ID) {
         if let Err(update_error) = tray.set_tooltip(Some(locale_text(
             &locale,
-            "EasyCLIProxyAPI · 内核操作失败",
-            "EasyCLIProxyAPI · Core operation failed",
+            "Quota Gateway · 内核操作失败",
+            "Quota Gateway · Core operation failed",
         ))) {
             eprintln!("更新 Windows 托盘错误提示失败: {update_error}");
         }
@@ -461,8 +461,8 @@ pub(crate) fn run_windows_tray_core_action(
     if let Some(tray) = app_handle.tray_by_id(WINDOWS_TRAY_ID) {
         if let Err(error) = tray.set_tooltip(Some(locale_text(
             &tray_state.locale(),
-            "EasyCLIProxyAPI · 内核处理中",
-            "EasyCLIProxyAPI · Core working",
+            "Quota Gateway · 内核处理中",
+            "Quota Gateway · Core working",
         ))) {
             eprintln!("更新 Windows 托盘处理中提示失败: {error}");
         }
@@ -579,7 +579,7 @@ pub(crate) fn setup_windows_tray(app: &mut tauri::App<tauri::Wry>) -> tauri::Res
                 .cloned()
                 .expect("application icon is required for the tray"),
         )
-        .tooltip("EasyCLIProxyAPI")
+        .tooltip("Quota Gateway")
         .menu(&menu)
         .show_menu_on_left_click(false)
         .on_menu_event(move |app_handle, event| match event.id().as_ref() {

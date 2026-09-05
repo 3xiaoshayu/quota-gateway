@@ -29,13 +29,7 @@ import {
 } from 'lucide-react';
 import claudeIcon from '../assets/icons/claude.svg';
 import codexIcon from '../assets/icons/codex.svg';
-import deepseekIcon from '../assets/icons/deepseek.svg';
-import hermesIcon from '../assets/icons/hermes.png';
-import grokIcon from '../assets/icons/grok.svg';
-import kimiIcon from '../assets/icons/kimi-light.svg';
-import openclawIcon from '../assets/icons/openclaw.svg';
 import opencodeIcon from '../assets/icons/opencode.svg';
-import piIcon from '../assets/icons/pi-logo-on-light.svg';
 import zcodeIcon from '../assets/icons/zcode.png';
 import {
   agentModelAlias,
@@ -58,7 +52,6 @@ import {
 } from '../services/agentLaunchDirectoryHistory';
 import type { ModelOption } from '../services/modelService';
 import { getCurrentLocale, translate, useI18n } from '../i18n';
-import { CodexSessionsPanel } from './CodexSessionsPanel';
 
 type AgentClientId =
   | 'claude-code'
@@ -225,28 +218,10 @@ const agentDefinitions: AgentDefinition[] = [
     descriptionKey: 'agents.description.codex',
   },
   {
-    id: 'deepseek-harness',
-    name: 'DeepSeek Harness',
-    icon: deepseekIcon,
-    descriptionKey: 'agents.description.deepseekHarness',
-  },
-  {
     id: 'opencode',
     name: 'OpenCode',
     icon: opencodeIcon,
     descriptionKey: 'agents.description.opencode',
-  },
-  {
-    id: 'pi',
-    name: 'Pi',
-    icon: piIcon,
-    descriptionKey: 'agents.description.pi',
-  },
-  {
-    id: 'grok-build',
-    name: 'Grok Build',
-    icon: grokIcon,
-    descriptionKey: 'agents.description.grokBuild',
   },
   {
     id: 'zcode',
@@ -254,35 +229,12 @@ const agentDefinitions: AgentDefinition[] = [
     icon: zcodeIcon,
     descriptionKey: 'agents.description.zcode',
   },
-  {
-    id: 'kimi-code',
-    name: 'Kimi Code',
-    icon: kimiIcon,
-    descriptionKey: 'agents.description.kimiCode',
-  },
-  {
-    id: 'openclaw',
-    name: 'OpenClaw',
-    icon: openclawIcon,
-    descriptionKey: 'agents.description.openclaw',
-  },
-  {
-    id: 'hermes',
-    name: 'Hermes Agent',
-    icon: hermesIcon,
-    descriptionKey: 'agents.description.hermes',
-  },
 ];
 
 const agentSubpages: AgentSubpageDefinition[] = [
   {
     id: 'core',
     labelKey: 'agents.tabs.core',
-  },
-  {
-    id: 'sessions',
-    labelKey: 'agents.tabs.sessions',
-    clients: ['codex'],
   },
 ];
 
@@ -1624,6 +1576,7 @@ export function AgentsPage({ embedded = false, onConfigurationApplied }: AgentsP
             </div>
           ) : (
           <>
+          {availableSubpages.length > 1 ? (
           <div className="agent-subpage-tabs" role="tablist" aria-label={t('agents.tabs.label')}>
             {availableSubpages.map((subpage) => (
               <button
@@ -1641,6 +1594,7 @@ export function AgentsPage({ embedded = false, onConfigurationApplied }: AgentsP
               </button>
             ))}
           </div>
+          ) : null}
 
           {activeSubpage === 'core' ? (
             <div
@@ -2080,17 +2034,6 @@ export function AgentsPage({ embedded = false, onConfigurationApplied }: AgentsP
                 </div>
               </div>
 
-            </div>
-          ) : null}
-
-          {selected === 'codex' && activeSubpage === 'sessions' ? (
-            <div
-              className="agent-sessions-page"
-              id="agent-subpage-panel-sessions"
-              role="tabpanel"
-              aria-labelledby="agent-subpage-tab-sessions"
-            >
-              <CodexSessionsPanel />
             </div>
           ) : null}
           </>

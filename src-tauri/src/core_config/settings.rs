@@ -39,40 +39,6 @@ pub(crate) fn api_access_key_hash(value: &str) -> Option<String> {
     (!value.is_empty()).then(|| sha256_bytes(value.as_bytes()))
 }
 
-pub(crate) fn usage_provider_section(provider: &str) -> Option<&'static str> {
-    match provider.trim().to_ascii_lowercase().as_str() {
-        "codex" => Some("codex-api-key"),
-        "claude" => Some("claude-api-key"),
-        "gemini" | "aistudio" => Some("gemini-api-key"),
-        "openai" | "openai-compatibility" => Some("openai-compatibility"),
-        _ => None,
-    }
-}
-
-impl GuiConfigFile {
-    pub(crate) fn api_access_remark_for_source(
-        &self,
-        provider: &str,
-        source: &str,
-    ) -> Option<&str> {
-        let hash = api_access_key_hash(source)?;
-        let preferred_section = usage_provider_section(provider);
-        self.api_access_remarks
-            .iter()
-            .find(|entry| {
-                preferred_section == Some(entry.provider_section.as_str())
-                    && entry.api_key_hash == hash
-                    && !entry.remark.is_empty()
-            })
-            .or_else(|| {
-                self.api_access_remarks
-                    .iter()
-                    .find(|entry| entry.api_key_hash == hash && !entry.remark.is_empty())
-            })
-            .map(|entry| entry.remark.as_str())
-    }
-}
-
 pub(crate) fn validate_management_secret_key(secret_key: &str) -> Result<(), String> {
     if secret_key.chars().count() > 512 {
         return Err("管理密钥不能超过 512 个字符".to_string());

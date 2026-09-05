@@ -5,17 +5,14 @@ mod app_settings;
 mod app_update;
 mod claude_catalog;
 mod codex_catalog;
-mod codex_sessions;
 mod configuration_watcher;
 mod core_config;
 mod core_runtime;
 mod instance_lock;
 mod management_api;
 mod oauth_browser;
-mod provider_health;
 #[cfg(any(target_os = "macos", target_os = "windows"))]
 mod tray;
-mod usage;
 
 #[cfg(test)]
 use configuration_watcher::nearest_existing_watch_directory;
@@ -24,11 +21,6 @@ use management_api::{
     management_http_client, read_management_text, read_management_value,
 };
 use oauth_browser::*;
-#[cfg(test)]
-use provider_health::{
-    provider_health_content_type_is_streaming, provider_health_stream_has_terminal_success,
-    provider_health_stream_has_text,
-};
 
 use agents::*;
 use app_settings::*;
@@ -875,7 +867,8 @@ impl Default for GuiConfigFile {
     fn default() -> Self {
         Self {
             locale: "zh-CN".to_string(),
-            port: 8317,
+            // 8318 keeps a stock EasyCLIProxyAPI on 8317 runnable side by side.
+            port: 8318,
             allow_lan: false,
             host: "127.0.0.1".to_string(),
             run_on_startup: false,
@@ -896,7 +889,9 @@ impl Default for GuiConfigFile {
             logging_to_file: false,
             logs_max_total_size_mb: DEFAULT_LOGS_MAX_TOTAL_SIZE_MB,
             error_logs_max_files: DEFAULT_ERROR_LOGS_MAX_FILES,
-            usage_statistics_enabled: true,
+            // The usage-records page is gone, so the core does not need to keep
+            // per-request statistics in memory.
+            usage_statistics_enabled: false,
             redis_usage_queue_retention_seconds: DEFAULT_REDIS_USAGE_QUEUE_RETENTION_SECONDS,
             request_log: false,
             plugins_enabled: false,
@@ -2287,7 +2282,6 @@ fn main() {
         .manage(CoreDownloadState::default())
         .manage(AppUpdateState::default())
         .manage(CoreProcessState::new(gui_config.start_core_on_launch))
-        .manage(usage::UsageCollectorState::default())
         .manage(GuiConfigState::new(gui_config))
         .manage(MainWindowSizeState::new(initial_window_size))
         .manage(AgentConfigStatusCache::default());
@@ -2377,14 +2371,6 @@ fn main() {
             {
                 eprintln!("启动配置文件监控失败: {error}");
             }
-
-            let usage_app = app.handle().clone();
-            tauri::async_runtime::spawn_blocking(move || {
-                if let Err(error) = usage::initialize_usage_storage() {
-                    eprintln!("初始化使用记录目录失败: {error}");
-                }
-                usage::start_usage_collector(usage_app);
-            });
 
             let agent_status_app = app.handle().clone();
             tauri::async_runtime::spawn_blocking(move || {
@@ -2517,7 +2503,6 @@ fn main() {
             set_core_management_secret_key,
             clear_core_management_secret_key,
             management_api::management_request,
-            provider_health::provider_health_probe,
             management_api::upload_auth_file,
             management_api::open_auth_files_directory,
             management_api::open_core_logs_directory,
@@ -2547,23 +2532,9 @@ fn main() {
             install_bundled_core,
             cancel_core_install,
             get_core_install_task,
-            usage::get_usage_collector_status,
-            usage::get_usage_overview,
-            usage::get_usage_analysis,
-            usage::get_usage_events,
-            usage::get_usage_pricing,
-            usage::repair_usage_cache_records,
-            usage::save_usage_model_price,
-            usage::delete_usage_model_price,
-            usage::sync_usage_model_prices,
             start_core_process,
             stop_core_process,
-            restart_core_process,
-            codex_sessions::list_codex_sessions,
-            codex_sessions::delete_codex_sessions,
-            codex_sessions::repair_codex_session_metadata,
-            codex_sessions::preview_codex_session_index_cleanup,
-            codex_sessions::apply_codex_session_index_cleanup
+            restart_core_process
         ])
         .build(tauri::generate_context!())
         .expect("failed to build app");
@@ -2580,7 +2551,6 @@ fn main() {
             }
         }
         tauri::RunEvent::Exit => {
-            usage::stop_usage_collector(app_handle);
             let gui_config_state = app_handle.state::<GuiConfigState>();
             let process_state = app_handle.state::<CoreProcessState>();
             shutdown_managed_core(process_state.inner(), gui_config_state.inner());

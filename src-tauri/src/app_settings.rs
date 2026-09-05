@@ -2,7 +2,7 @@ use super::*;
 
 #[tauri::command]
 pub(crate) fn health_check() -> &'static str {
-    "EasyCLIProxyAPI Rust backend is ready"
+    "Quota Gateway Rust backend is ready"
 }
 
 #[tauri::command]

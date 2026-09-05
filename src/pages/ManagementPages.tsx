@@ -11,8 +11,6 @@ import {
 import antigravityIcon from '../assets/icons/antigravity.svg';
 import claudeIcon from '../assets/icons/claude.svg';
 import codexIcon from '../assets/icons/codex.svg';
-import grokIcon from '../assets/icons/grok.svg';
-import kimiIcon from '../assets/icons/kimi-light.svg';
 import { useI18n } from '../i18n';
 import { oauthSubpages, type OAuthSubpage } from '../oauthNavigation';
 import {
@@ -61,12 +59,12 @@ type OAuthStatusResult = {
   error?: string | null;
 };
 
+// Kimi and xAI stay supported by the core; the console only offers the three
+// subscriptions this product is about.
 const oauthProviders = [
   { id: 'codex' as const, name: 'Codex OAuth', icon: codexIcon },
   { id: 'claude' as const, name: 'Claude OAuth', icon: claudeIcon },
   { id: 'antigravity' as const, name: 'Antigravity OAuth', icon: antigravityIcon },
-  { id: 'kimi' as const, name: 'Kimi OAuth', icon: kimiIcon },
-  { id: 'xai' as const, name: 'xAI OAuth', icon: grokIcon },
 ];
 
 const OAUTH_CALLBACK_SUPPORTED = new Set<OAuthProviderId>([
@@ -556,7 +554,7 @@ export function OAuthLoginPage() {
                             callbackError: undefined,
                           });
                         }}
-                        placeholder={provider.id === 'xai' ? t('oauth.xaiCallbackPlaceholder') : t('oauth.callbackPlaceholder')}
+                        placeholder={t('oauth.callbackPlaceholder')}
                       />
                       <button type="button" className="secondary-button" disabled={state.callbackSubmitting} onClick={() => void submitCallback(provider.id)}>
                         {state.callbackSubmitting ? <LoaderCircle size={16} className="spin" aria-hidden="true" /> : <Check size={16} aria-hidden="true" />}

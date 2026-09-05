@@ -12,7 +12,7 @@ for (let index = 2; index < process.argv.length; index += 2) {
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const output = resolve(args.get('--output') ?? join(root, 'bin-work'));
-const binary = resolve(args.get('--binary') ?? join(root, 'src-tauri', 'target', 'release', process.platform === 'win32' ? 'cpa-gui.exe' : 'cpa-gui'));
+const binary = resolve(args.get('--binary') ?? join(root, 'src-tauri', 'target', 'release', process.platform === 'win32' ? 'quota-gateway.exe' : 'quota-gateway'));
 const targetOS = args.get('--os') ?? ({ linux: 'linux', darwin: 'darwin', win32: 'windows' })[process.platform];
 const targetArch = args.get('--arch') ?? ({ x64: 'amd64', arm64: 'aarch64' })[process.arch];
 const shouldDownload = args.get('--download') === 'true';
@@ -76,19 +76,19 @@ if (verification && verification.actual !== verification.expected) {
 }
 
 await mkdir(output, { recursive: true });
-const outputBinary = join(output, targetOS === 'windows' ? 'EasyCLIProxyAPI.exe' : 'EasyCLIProxyAPI');
-const legacyOutputBinary = join(output, targetOS === 'windows' ? 'cpa-gui.exe' : 'cpa-gui');
+const outputBinary = join(output, targetOS === 'windows' ? 'Quota Gateway.exe' : 'Quota Gateway');
+const legacyOutputBinary = join(output, targetOS === 'windows' ? 'EasyCLIProxyAPI.exe' : 'EasyCLIProxyAPI');
 await rm(legacyOutputBinary, { force: true });
 await copyFile(binary, outputBinary);
 if (targetOS !== 'windows') await chmod(outputBinary, 0o755);
 await copyFile(join(root, 'core-version.txt'), join(output, 'core-version.txt'));
 await writeFile(join(output, 'portable-app.json'), `${JSON.stringify({
   schemaVersion: 1,
-  application: 'EasyCLIProxyAPI',
+  application: 'Quota Gateway',
   version: appVersion,
   platform: targetOS,
   arch: targetArch,
-  autoUpdate: ['windows', 'linux', 'darwin'].includes(targetOS),
+  autoUpdate: false,
 }, null, 2)}\n`);
 
 const coreOutput = join(output, 'cpa-core');

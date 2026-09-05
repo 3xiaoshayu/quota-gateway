@@ -16,8 +16,11 @@ import claudeIcon from '../assets/icons/claude.svg';
 import geminiIcon from '../assets/icons/gemini.svg';
 import { clientApiProfiles } from '../services/clientAccess';
 import { useI18n } from '../i18n';
-import { useAppUpdate } from '../appUpdate';
-import { VersionManagementPage, displayAppVersion } from './VersionManagementPage';
+
+function displayAppVersion(version: string) {
+  const resolvedVersion = version.trim();
+  return resolvedVersion.startsWith('v') ? resolvedVersion : `v${resolvedVersion}`;
+}
 
 type MessageType = 'info' | 'success' | 'error';
 type CoreProcessCommand = 'start_core_process' | 'stop_core_process' | 'restart_core_process';
@@ -38,15 +41,8 @@ type CoreTlsSettings = {
   key: string;
 };
 
-export type KernelView = 'home' | 'versions';
-
-export function KernelPage({ view = 'home' }: { view?: KernelView }) {
-  if (view === 'versions') {
-    return <VersionManagementPage />;
-  }
-
+export function KernelPage() {
   const { t } = useI18n();
-  const { info: appUpdate } = useAppUpdate();
   const {
     status: coreStatus,
     statusError,
@@ -56,7 +52,7 @@ export function KernelPage({ view = 'home' }: { view?: KernelView }) {
 
   const [installedAppVersion, setInstalledAppVersion] = useState('');
   const [listenHost, setListenHost] = useState('127.0.0.1');
-  const [customPort, setCustomPort] = useState('8317');
+  const [customPort, setCustomPort] = useState('8318');
   const [processBusy, setProcessBusy] = useState(false);
   const [processNotice, setProcessNotice] = useState<{
     message: string;
@@ -68,7 +64,7 @@ export function KernelPage({ view = 'home' }: { view?: KernelView }) {
   const [showHomeApiKey, setShowHomeApiKey] = useState(false);
   const [tlsEnabled, setTlsEnabled] = useState(false);
 
-  const savedPortRef = useRef(8317);
+  const savedPortRef = useRef(8318);
   const processNoticeTimerRef = useRef<number | null>(null);
   const copiedApiTimerRef = useRef<number | null>(null);
 
@@ -214,9 +210,8 @@ export function KernelPage({ view = 'home' }: { view?: KernelView }) {
       ? t('common.detectionFailed')
       : t('common.detecting');
 
-  const resolvedAppVersion = appUpdate?.currentVersion || installedAppVersion;
-  const currentAppVersion = resolvedAppVersion
-    ? displayAppVersion(resolvedAppVersion)
+  const currentAppVersion = installedAppVersion
+    ? displayAppVersion(installedAppVersion)
     : t('common.detecting');
 
   const apiPort = Number(customPort);

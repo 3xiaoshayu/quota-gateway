@@ -80,7 +80,7 @@ fn gui_config_defaults_are_stable() {
     let config = GuiConfigFile::default();
     let content = toml::to_string_pretty(&config).unwrap();
 
-    assert!(content.contains("port = 8317"));
+    assert!(content.contains("port = 8318"));
     assert!(content.contains("allow-lan = false"));
     assert!(content.contains("run-on-startup = false"));
     assert!(content.contains("start-core-on-launch = true"));

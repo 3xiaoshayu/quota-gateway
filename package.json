@@ -1,5 +1,5 @@
 {
-  "name": "cpa-gui",
+  "name": "quota-gateway",
   "private": true,
   "type": "module",
   "packageManager": "bun@1.3.14",

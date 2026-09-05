@@ -10,5 +10,4 @@ mod core_runtime;
 mod instance_lock;
 mod model_aliases;
 mod platform;
-mod provider_health;
 mod support;

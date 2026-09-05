@@ -1,0 +1,339 @@
+/*
+ * Quota Gateway skin. Loaded after the upstream stylesheet, so it only has to
+ * restate what changes: the Quota Switcher palette (theme-tokens.css), the
+ * Inter/system font stack, the flat "Apple material" cards, and the sidebar.
+ */
+@import './theme-tokens.css';
+
+:root {
+  font-family:
+    'Inter', 'Segoe UI Variable Text', 'Segoe UI', 'PingFang SC', 'Microsoft YaHei',
+    system-ui, sans-serif;
+  letter-spacing: -0.01em;
+  color-scheme: dark;
+  -webkit-font-smoothing: antialiased;
+  --qg-base: #131315;
+  --qg-surface: #1c1c1e;
+  --qg-card: rgba(255, 255, 255, 0.045);
+  --qg-fill: rgba(255, 255, 255, 0.055);
+  --qg-fill-2: rgba(255, 255, 255, 0.09);
+  --qg-fill-3: rgba(255, 255, 255, 0.14);
+  --qg-sep: rgba(255, 255, 255, 0.075);
+  --qg-label: rgba(255, 255, 255, 0.96);
+  --qg-label-2: rgba(235, 235, 245, 0.62);
+  --qg-label-3: rgba(235, 235, 245, 0.34);
+  --qg-accent: #0a84ff;
+  --qg-accent-hi: #409cff;
+  --qg-ok: #30d158;
+  --qg-warn: #ff9f0a;
+  --qg-danger: #ff453a;
+  --qg-radius-card: 16px;
+  --qg-radius-control: 10px;
+}
+
+html,
+body,
+#root,
+.app-shell,
+.app-error-boundary {
+  background: var(--qg-base);
+}
+
+/* Sidebar: flat window base with a hairline, like the Quota Switcher rail. */
+.app-shell {
+  grid-template-columns: 232px minmax(0, 1fr);
+}
+
+.sidebar {
+  padding: 22px 14px 18px;
+  border-right: 1px solid var(--qg-sep);
+  background: var(--qg-base);
+}
+
+.sidebar-brand {
+  grid-template-columns: 44px minmax(0, 1fr);
+  margin-bottom: 26px;
+}
+
+.brand-mark {
+  width: 44px;
+  height: 44px;
+  border: 1px solid var(--qg-fill-2);
+  border-radius: 12px;
+  background: var(--qg-surface);
+  box-shadow: none;
+}
+
+.sidebar-brand strong {
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+.sidebar-brand div > span {
+  margin-top: 2px;
+  color: var(--qg-label-3);
+  font-size: 11px;
+}
+
+.nav-section {
+  gap: 4px;
+}
+
+.nav-section button {
+  min-height: 40px;
+  padding: 0 12px;
+  border-color: transparent;
+  border-radius: var(--qg-radius-control);
+  color: var(--qg-label-2);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.nav-section button svg {
+  color: var(--qg-label-3);
+}
+
+.nav-section button:hover {
+  background: var(--qg-fill);
+  color: var(--qg-label);
+  transform: none;
+}
+
+.nav-section button:hover svg {
+  color: var(--qg-label-2);
+}
+
+.nav-section button.active,
+.nav-section button.active:hover {
+  border-color: transparent;
+  background: rgba(10, 132, 255, 0.16);
+  color: #ffffff;
+  box-shadow: none;
+}
+
+.nav-section button.active svg {
+  color: var(--qg-accent-hi);
+}
+
+/* Cards: an even hairline ring on a 4.5% wash, no shadows. */
+.panel,
+.empty-state,
+.client-api-card,
+.config-dialog,
+.close-dialog,
+.agent-launch-directory-dialog {
+  border: 1px solid var(--qg-sep);
+  border-radius: var(--qg-radius-card);
+  background: var(--qg-card);
+  box-shadow: none;
+}
+
+.empty-state {
+  border-style: solid;
+}
+
+.quiet-panel {
+  background: var(--qg-fill);
+}
+
+.panel h2 {
+  font-size: 17px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+.client-api-card {
+  border-radius: 12px;
+  background: var(--qg-fill);
+}
+
+.client-api-logo {
+  border: 1px solid var(--qg-sep);
+  border-radius: 10px;
+  background: #ffffff;
+}
+
+.config-dialog,
+.close-dialog {
+  background: rgba(36, 36, 38, 0.94);
+  -webkit-backdrop-filter: blur(24px) saturate(150%);
+  backdrop-filter: blur(24px) saturate(150%);
+}
+
+.config-dialog-backdrop,
+.close-dialog-backdrop {
+  background: rgba(0, 0, 0, 0.55);
+}
+
+/* Buttons. */
+.primary-button,
+.secondary-button,
+.danger-button {
+  min-height: 38px;
+  border-radius: var(--qg-radius-control);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.primary-button {
+  border-color: transparent;
+  background: var(--qg-accent);
+  box-shadow: none;
+}
+
+.primary-button:hover:not(:disabled) {
+  border-color: transparent;
+  background: var(--qg-accent-hi);
+}
+
+.secondary-button {
+  border-color: transparent;
+  background: var(--qg-fill-2);
+  color: var(--qg-label);
+}
+
+.secondary-button:hover:not(:disabled) {
+  background: var(--qg-fill-3);
+}
+
+.danger-button {
+  border-color: transparent;
+  background: rgba(255, 69, 58, 0.14);
+  color: var(--qg-danger);
+}
+
+.danger-button:hover:not(:disabled) {
+  background: rgba(255, 69, 58, 0.24);
+}
+
+.icon-button {
+  border-radius: 8px;
+}
+
+/* Status pills. */
+.state-pill {
+  min-height: 26px;
+  border-color: transparent;
+  background: var(--qg-fill-2);
+  color: var(--qg-label-2);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.state-pill.success {
+  border-color: transparent;
+  background: rgba(48, 209, 88, 0.16);
+  color: var(--qg-ok);
+}
+
+.state-pill.error {
+  border-color: transparent;
+  background: rgba(255, 69, 58, 0.16);
+  color: var(--qg-danger);
+}
+
+.state-pill.warning,
+.state-pill.update {
+  border-color: transparent;
+  background: rgba(255, 159, 10, 0.16);
+  color: var(--qg-warn);
+}
+
+/* Inputs. */
+.config-network-input,
+input[type='text'],
+input[type='number'],
+input[type='password'],
+input[type='search'],
+input[type='url'],
+select,
+textarea {
+  border-radius: var(--qg-radius-control);
+}
+
+.config-network-input {
+  border-color: var(--qg-fill-2);
+  background: var(--qg-fill);
+  color: var(--qg-label);
+}
+
+.config-network-input:focus {
+  border-color: var(--qg-accent);
+  box-shadow: 0 0 0 3px rgba(10, 132, 255, 0.22);
+}
+
+.config-network-input.error {
+  border-color: var(--qg-danger);
+  box-shadow: 0 0 0 3px rgba(255, 69, 58, 0.16);
+}
+
+button:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible {
+  outline: 2px solid rgba(10, 132, 255, 0.6);
+  outline-offset: 2px;
+}
+
+/* Segmented tabs. */
+.agent-subpage-tabs {
+  gap: 4px;
+  padding: 4px;
+  border-color: var(--qg-sep);
+  border-radius: 12px;
+  background: var(--qg-fill);
+}
+
+.agent-subpage-tabs button {
+  border-radius: 9px;
+  color: var(--qg-label-2);
+  font-weight: 600;
+}
+
+.agent-subpage-tabs button:hover {
+  background: var(--qg-fill);
+  color: var(--qg-label);
+}
+
+.agent-subpage-tabs button.active {
+  background: var(--qg-fill-3);
+  color: var(--qg-label);
+  box-shadow: none;
+}
+
+/* Toasts. */
+.config-toast {
+  border-radius: 12px;
+  background: rgba(36, 36, 38, 0.94);
+  -webkit-backdrop-filter: blur(20px) saturate(150%);
+  backdrop-filter: blur(20px) saturate(150%);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.4);
+}
+
+/* Scrollbars, macOS overlay look. */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  border: 1.5px solid transparent;
+  border-radius: 9999px;
+  background: rgba(255, 255, 255, 0.14);
+  background-clip: padding-box;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.26);
+  background-clip: padding-box;
+}
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.14) transparent;
+}
