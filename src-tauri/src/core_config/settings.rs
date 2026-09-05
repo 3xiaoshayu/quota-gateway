@@ -34,11 +34,6 @@ pub(crate) fn validate_api_access_provider_section(section: &str) -> Result<(), 
     }
 }
 
-pub(crate) fn api_access_key_hash(value: &str) -> Option<String> {
-    let value = value.trim();
-    (!value.is_empty()).then(|| sha256_bytes(value.as_bytes()))
-}
-
 pub(crate) fn validate_management_secret_key(secret_key: &str) -> Result<(), String> {
     if secret_key.chars().count() > 512 {
         return Err("管理密钥不能超过 512 个字符".to_string());
@@ -344,75 +339,6 @@ pub(crate) fn is_top_level_yaml_mapping_field(line: &str) -> bool {
         }
     }
     false
-}
-
-pub(crate) fn patch_core_network_yaml(
-    content: &str,
-    config: &GuiConfigFile,
-) -> Result<Option<String>, String> {
-    patch_core_yaml_document(content, |document| {
-        let original = document.clone();
-        apply_network_settings(document, config)?;
-        Ok(*document != original)
-    })
-}
-
-pub(crate) fn patch_core_network_routing_yaml(
-    content: &str,
-    config: &GuiConfigFile,
-) -> Result<Option<String>, String> {
-    patch_core_yaml_document(content, |document| {
-        let original = document.clone();
-        apply_network_settings(document, config)?;
-        set_core_yaml_top_level_value(
-            document,
-            "proxy-url",
-            serde_norway::Value::String(config.proxy_url.clone()),
-        )?;
-        set_core_yaml_nested_value(
-            document,
-            "routing",
-            "session-affinity",
-            serde_norway::Value::Bool(config.routing_session_affinity),
-        )?;
-        set_core_yaml_nested_value(
-            document,
-            "routing",
-            "session-affinity-ttl",
-            serde_norway::Value::String(config.routing_session_affinity_ttl.clone()),
-        )?;
-        set_core_yaml_top_level_value(
-            document,
-            "disable-cooling",
-            serde_norway::Value::Bool(config.disable_cooling),
-        )?;
-        set_core_yaml_top_level_value(
-            document,
-            "request-retry",
-            serde_norway::to_value(config.request_retry)
-                .map_err(|err| format!("序列化请求重试次数失败: {err}"))?,
-        )?;
-        set_core_yaml_top_level_value(
-            document,
-            "max-retry-credentials",
-            serde_norway::to_value(config.max_retry_credentials)
-                .map_err(|err| format!("序列化最大重试凭据数失败: {err}"))?,
-        )?;
-        set_core_yaml_top_level_value(
-            document,
-            "max-retry-interval",
-            serde_norway::to_value(config.max_retry_interval)
-                .map_err(|err| format!("序列化最大重试等待时间失败: {err}"))?,
-        )?;
-        set_core_yaml_nested_value(
-            document,
-            "streaming",
-            "bootstrap-retries",
-            serde_norway::to_value(config.streaming_bootstrap_retries)
-                .map_err(|err| format!("序列化流式启动重试次数失败: {err}"))?,
-        )?;
-        Ok(*document != original)
-    })
 }
 
 pub(crate) fn patch_core_network_endpoint_yaml(

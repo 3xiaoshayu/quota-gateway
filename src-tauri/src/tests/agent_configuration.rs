@@ -346,52 +346,6 @@ fn codex_oauth_configuration_uses_openai_auth_with_bearer_token() {
 }
 
 #[test]
-fn codex_oauth_configuration_is_preserved_for_legacy_updates() {
-    let home = agent_test_home("codex-oauth-preserved-update");
-    let codex_dir = home.join(".codex");
-    fs::create_dir_all(&codex_dir).unwrap();
-    fs::write(
-        codex_dir.join("config.toml"),
-        "[model_providers.cpa-gui]\nrequires_openai_auth = true\n",
-    )
-    .unwrap();
-    fs::write(
-        codex_dir.join("auth.json"),
-        r#"{"tokens":{"access_token":"oauth-access-token"}}"#,
-    )
-    .unwrap();
-
-    let oauth_configuration = current_codex_oauth_configuration(&home).unwrap();
-    assert!(oauth_configuration);
-
-    let models = test_agent_models(&["gpt-test"]);
-    let catalog = test_codex_models(&["gpt-test"]);
-    let updates = build_agent_updates_with_oauth(
-        AgentClient::Codex,
-        &home,
-        8317,
-        DEFAULT_API_KEY,
-        "gpt-test",
-        AgentConfigurationOptions {
-            models: &models,
-            codex_catalog: Some(&catalog),
-            oauth_configuration,
-            claude_code_model_mappings: None,
-            claude_desktop_model_mappings: None,
-        },
-    )
-    .unwrap();
-
-    assert!(updates[0].after.contains("requires_openai_auth = true"));
-    assert!(
-        serde_json::from_str::<serde_json::Value>(&updates[2].after).unwrap()["tokens"]
-            ["access_token"]
-            .is_string()
-    );
-    fs::remove_dir_all(home).unwrap();
-}
-
-#[test]
 fn codex_api_and_oauth_modes_write_the_same_catalog() {
     let home = agent_test_home("codex-auth-mode-catalog");
     fs::create_dir_all(home.join(".codex")).unwrap();
@@ -2215,66 +2169,6 @@ fn agent_model_validation_only_accepts_models_in_current_list() {
     );
     assert!(resolve_available_agent_model(&models, "removed-model").is_err());
     assert!(resolve_available_agent_model(&[], "gpt-5.4").is_err());
-}
-
-#[test]
-fn thinking_alias_sources_only_include_current_core_models() {
-    let input = "codex-api-key:\n  - name: Codex API\n    api-key: test\n    models:\n      - name: config-only\nopenai-compatibility:\n  - name: DeepSeek\n    base-url: https://api.deepseek.com\n    api-key-entries:\n      - api-key: test\n    models:\n      - name: DeepSeek-Chat\n";
-    let definitions = parse_codex_model_definitions(&serde_json::json!({
-        "models": [
-            {
-                "id": "gpt-runtime",
-                "thinking": { "levels": ["low", "high"] }
-            },
-            {
-                "id": "gpt-built-in-only",
-                "thinking": { "levels": ["low", "high"] }
-            }
-        ]
-    }))
-    .unwrap();
-    let available_models = test_agent_models(&["GPT-RUNTIME", "deepseek-chat"]);
-
-    let sources = resolved_thinking_alias_sources(input, &definitions, &available_models).unwrap();
-    let source_models = sources
-        .iter()
-        .map(|source| source.source.model.as_str())
-        .collect::<Vec<_>>();
-
-    assert_eq!(source_models, vec!["DeepSeek-Chat", "gpt-runtime"]);
-    assert!(!source_models.contains(&"gpt-built-in-only"));
-    assert!(!source_models.contains(&"config-only"));
-}
-
-#[test]
-fn thinking_alias_prefers_codex_api_key_model_over_same_named_oauth_definition() {
-    let input = "codex-api-key:\n  - name: CPA\n    api-key: test\n    models:\n      - name: gpt-5.6-luna\n";
-    let definitions = parse_codex_model_definitions(&serde_json::json!({
-        "models": [{
-            "id": "gpt-5.6-luna",
-            "thinking": { "levels": ["low", "high", "xhigh"] }
-        }]
-    }))
-    .unwrap();
-    let available_models = test_agent_models(&["gpt-5.6-luna"]);
-
-    let sources = resolved_thinking_alias_sources(input, &definitions, &available_models).unwrap();
-
-    assert_eq!(sources.len(), 1);
-    assert_eq!(sources[0].source.model, "gpt-5.6-luna");
-    assert_eq!(sources[0].source.kind, "codex-api");
-    assert!(matches!(
-        sources[0].location,
-        ThinkingAliasSourceLocation::ConfigModel {
-            section: "codex-api-key",
-            ..
-        }
-    ));
-
-    let rendered =
-        add_model_alias_to_yaml(input, &sources[0], "gpt-5.6-luna-xhigh", "xhigh", false).unwrap();
-    assert!(rendered.contains("alias: gpt-5.6-luna-xhigh"), "{rendered}");
-    assert!(!rendered.contains("oauth-model-alias"), "{rendered}");
 }
 
 #[cfg(target_os = "windows")]

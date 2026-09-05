@@ -33,23 +33,3 @@ pub(super) fn test_codex_models(names: &[&str]) -> String {
     codex_catalog::prepare_catalog(&runtime).unwrap().json
 }
 
-pub(super) fn test_codex_oauth_thinking_source(model: &str) -> ResolvedThinkingAliasSource {
-    ResolvedThinkingAliasSource {
-        source: ThinkingAliasSource {
-            id: format!("codex-oauth:{model}"),
-            model: model.to_string(),
-            display_name: None,
-            provider: "Codex OAuth".to_string(),
-            kind: "codex-oauth".to_string(),
-            protocol: "codex".to_string(),
-            reasoning_levels: vec!["low", "medium", "high", "xhigh", "max"]
-                .into_iter()
-                .map(str::to_string)
-                .collect(),
-        },
-        location: ThinkingAliasSourceLocation::Oauth {
-            channel: "codex",
-            force_mapping: false,
-        },
-    }
-}

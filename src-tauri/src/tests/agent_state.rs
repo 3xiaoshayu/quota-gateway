@@ -2,65 +2,6 @@ use super::support::*;
 use super::*;
 
 #[test]
-fn pi_provider_config_preserves_existing_fields_and_syncs_cpa_credentials() {
-    let rendered = build_pi_provider_config(
-        Some(r#"{"fast":true,"providerId":"custom","nested":{"keep":1}}"#),
-        "http://127.0.0.1:9527",
-        "agent-key",
-    )
-    .unwrap();
-    let value: serde_json::Value = serde_json::from_str(&rendered).unwrap();
-
-    assert_eq!(value["baseUrl"], "http://127.0.0.1:9527");
-    assert_eq!(value["apiKey"], "agent-key");
-    assert_eq!(value["fast"], true);
-    assert_eq!(value["providerId"], "custom");
-    assert_eq!(value["nested"]["keep"], 1);
-}
-
-#[test]
-fn pi_provider_settings_preserve_user_fields_and_set_cpa_defaults() {
-    let rendered = build_pi_provider_settings(
-            r#"{"theme":"dark","packages":["npm:@router-for-me/pi-cliproxyapi-provider"],"defaultProvider":"other","defaultModel":"old-model"}"#,
-            "new-model",
-        )
-        .unwrap();
-    let value: serde_json::Value = serde_json::from_str(&rendered).unwrap();
-
-    assert_eq!(value["theme"], "dark");
-    assert_eq!(value["packages"][0], PI_CLIPROXYAPI_PACKAGE);
-    assert_eq!(value["defaultProvider"], PI_CLIPROXYAPI_PROVIDER_ID);
-    assert_eq!(value["defaultModel"], "new-model");
-}
-
-#[test]
-fn repairing_pi_provider_updates_credentials_defaults_and_model() {
-    let home = agent_test_home("repair-pi-provider");
-    let settings_path = pi_provider_settings_path(&home);
-    fs::create_dir_all(settings_path.parent().unwrap()).unwrap();
-    fs::write(
-            &settings_path,
-            format!(
-                r#"{{"packages":["{PI_CLIPROXYAPI_PACKAGE}"],"defaultProvider":"other","defaultModel":"old-model"}}"#
-            ),
-        )
-        .unwrap();
-
-    let result = repair_pi_provider_inner(&home, 9527, "agent-key", "new-model").unwrap();
-    let provider: serde_json::Value =
-        serde_json::from_str(&fs::read_to_string(pi_provider_config_path(&home)).unwrap()).unwrap();
-    let settings: serde_json::Value =
-        serde_json::from_str(&fs::read_to_string(&settings_path).unwrap()).unwrap();
-
-    assert_eq!(result.model.as_deref(), Some("new-model"));
-    assert_eq!(provider["baseUrl"], "http://127.0.0.1:9527");
-    assert_eq!(provider["apiKey"], "agent-key");
-    assert_eq!(settings["defaultProvider"], PI_CLIPROXYAPI_PROVIDER_ID);
-    assert_eq!(settings["defaultModel"], "new-model");
-    fs::remove_dir_all(home).unwrap();
-}
-
-#[test]
 fn pi_provider_version_reads_installed_package_metadata() {
     let home = agent_test_home("pi-provider-version");
     let package_path = pi_provider_package_json_path(&home);
@@ -72,22 +13,6 @@ fn pi_provider_version_reads_installed_package_metadata() {
         Some("1.4.10")
     );
     fs::remove_dir_all(home).unwrap();
-}
-
-#[test]
-fn pi_provider_latest_version_parses_npm_metadata() {
-    assert_eq!(
-        parse_pi_provider_latest_version(&serde_json::json!({ "version": "1.5.0" })).unwrap(),
-        "1.5.0"
-    );
-    assert!(parse_pi_provider_latest_version(&serde_json::json!({})).is_err());
-}
-
-#[test]
-fn pi_provider_update_detection_requires_a_newer_semver() {
-    assert!(pi_provider_update_available("1.4.12", "1.5.0").unwrap());
-    assert!(!pi_provider_update_available("1.4.12", "1.4.12").unwrap());
-    assert!(!pi_provider_update_available("1.4.12", "1.4.11").unwrap());
 }
 
 #[test]

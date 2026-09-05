@@ -10,10 +10,10 @@ import { fileURLToPath } from 'node:url';
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const stylesheet = await readFile(join(root, 'src', 'styles.css'), 'utf8');
 
-// First :root block holds the light originals; every later block remaps them.
-const firstBlock = stylesheet.slice(0, stylesheet.indexOf('}'));
-const originals = [...firstBlock.matchAll(/--theme-([0-9a-f]{3,6}):\s*#([0-9a-f]{3,6});/g)]
-  .map(([, name, hex]) => [name, hex.length === 3 ? hex.replace(/(.)/g, '$1$1') : hex]);
+// Upstream named each variable after its light-theme hex, so the names still
+// referenced by the stylesheet are the complete list of originals.
+const names = [...new Set([...stylesheet.matchAll(/var\(--theme-([0-9a-f]{3,6})\b/g)].map(([, name]) => name))].sort();
+const originals = names.map((name) => [name, name.length === 3 ? name.replace(/(.)/g, '$1$1') : name]);
 
 const palette = {
   base: '#131315',

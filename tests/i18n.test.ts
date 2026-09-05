@@ -11,8 +11,8 @@ describe('i18n', () => {
   });
 
   it('translates messages and interpolates variables', () => {
-    expect(translate('zh-CN', 'kernel.install.installingVersion', { version: '1.2.3' }))
-      .toBe('正在安装 1.2.3');
+    expect(translate('zh-CN', 'agents.list.installedVersion', { version: '1.2.3' }))
+      .toBe('已安装 · 1.2.3');
     expect(translate('zh-CN', 'kernel.access.openaiDescription')).toBe('OpenAI兼容格式');
   });
 

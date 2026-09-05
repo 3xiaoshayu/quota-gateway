@@ -36,37 +36,6 @@ pub(crate) fn merge_core_config_for_start(
     Ok(config_path)
 }
 
-pub(crate) fn patch_core_network_settings(config: &GuiConfigFile) -> Result<(), String> {
-    let _config_guard = lock_core_config_file()?;
-    let install_dir = core_install_dir()?;
-    let config_path = install_dir.join(CORE_CONFIG_FILE);
-    if !config_path.is_file() {
-        return Ok(());
-    }
-
-    let content = fs::read_to_string(&config_path)
-        .map_err(|err| format!("读取内核配置失败 {}: {err}", path_to_string(&config_path)))?;
-    let Some(updated) = patch_core_network_yaml(&content, config)? else {
-        return Ok(());
-    };
-    write_yaml_if_changed(&config_path, &updated).map(|_| ())
-}
-
-pub(crate) fn patch_core_network_routing_settings(config: &GuiConfigFile) -> Result<(), String> {
-    let _config_guard = lock_core_config_file()?;
-    let config_path = core_install_dir()?.join(CORE_CONFIG_FILE);
-    if !config_path.is_file() {
-        return Ok(());
-    }
-
-    let content = fs::read_to_string(&config_path)
-        .map_err(|err| format!("读取内核配置失败 {}: {err}", path_to_string(&config_path)))?;
-    let Some(updated) = patch_core_network_routing_yaml(&content, config)? else {
-        return Ok(());
-    };
-    write_yaml_if_changed(&config_path, &updated).map(|_| ())
-}
-
 fn patch_installed_core_config_with(
     patch: impl FnOnce(&str) -> Result<Option<String>, String>,
 ) -> Result<(), String> {
@@ -258,23 +227,6 @@ pub(crate) fn patch_core_auth_dir(auth_dir: &str) -> Result<(), String> {
     })
 }
 
-pub(crate) fn patch_core_plugins_enabled(enabled: bool) -> Result<(), String> {
-    patch_existing_core_config(|document| {
-        set_core_yaml_nested_value(
-            document,
-            "plugins",
-            "enabled",
-            serde_norway::Value::Bool(enabled),
-        )
-    })
-}
-
-pub(crate) fn patch_core_request_log(enabled: bool) -> Result<(), String> {
-    patch_existing_core_config(|document| {
-        set_core_yaml_top_level_value(document, "request-log", serde_norway::Value::Bool(enabled))
-    })
-}
-
 pub(crate) fn patch_core_logging_settings(settings: &CoreConfigSettings) -> Result<(), String> {
     let settings = settings.clone();
     patch_existing_core_config(move |document| {
@@ -323,40 +275,6 @@ pub(crate) fn patch_core_routing_strategy(strategy: &str) -> Result<(), String> 
             "routing",
             "strategy",
             serde_norway::Value::String(strategy),
-        )
-    })
-}
-
-pub(crate) fn patch_core_proxy_url(proxy_url: &str) -> Result<(), String> {
-    let proxy_url = proxy_url.to_string();
-    patch_existing_core_config(move |document| {
-        set_core_yaml_top_level_value(
-            document,
-            "proxy-url",
-            serde_norway::Value::String(proxy_url),
-        )
-    })
-}
-
-pub(crate) fn patch_core_session_affinity(enabled: bool) -> Result<(), String> {
-    patch_existing_core_config(move |document| {
-        set_core_yaml_nested_value(
-            document,
-            "routing",
-            "session-affinity",
-            serde_norway::Value::Bool(enabled),
-        )
-    })
-}
-
-pub(crate) fn patch_core_session_affinity_ttl(ttl: &str) -> Result<(), String> {
-    let ttl = ttl.to_string();
-    patch_existing_core_config(move |document| {
-        set_core_yaml_nested_value(
-            document,
-            "routing",
-            "session-affinity-ttl",
-            serde_norway::Value::String(ttl),
         )
     })
 }

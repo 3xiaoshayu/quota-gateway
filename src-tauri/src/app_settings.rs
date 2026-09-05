@@ -1,16 +1,6 @@
 use super::*;
 
 #[tauri::command]
-pub(crate) fn health_check() -> &'static str {
-    "Quota Gateway Rust backend is ready"
-}
-
-#[tauri::command]
-pub(crate) fn detect_core_platform() -> Result<CorePlatform, String> {
-    current_core_platform()
-}
-
-#[tauri::command]
 pub(crate) fn get_core_status(
     process_state: tauri::State<'_, CoreProcessState>,
     gui_config_state: tauri::State<'_, GuiConfigState>,
@@ -26,80 +16,43 @@ pub(crate) fn emit_core_status(app: &tauri::AppHandle, status: &CoreStatus) {
 }
 
 #[tauri::command]
+pub(crate) fn open_external_url(app: tauri::AppHandle, url: String) -> Result<(), String> {
+    open_external_url_inner(&app, &url)
+}
+
+// Follows redirects only between GitHub hosts over plain HTTPS; used by the
+// Codex model catalog refresh.
+pub(crate) fn github_https_redirect_policy() -> reqwest::redirect::Policy {
+    reqwest::redirect::Policy::custom(|attempt| {
+        let url = attempt.url();
+        let trusted_host = matches!(
+            url.host_str(),
+            Some(
+                "github.com"
+                    | "raw.githubusercontent.com"
+                    | "objects.githubusercontent.com"
+                    | "release-assets.githubusercontent.com"
+            )
+        );
+        if url.scheme() == "https"
+            && url.port().is_none()
+            && url.username().is_empty()
+            && url.password().is_none()
+            && trusted_host
+        {
+            attempt.follow()
+        } else {
+            attempt.stop()
+        }
+    })
+}
+
+#[tauri::command]
 pub(crate) fn get_gui_settings(
     gui_config_state: tauri::State<'_, GuiConfigState>,
 ) -> Result<GuiSettings, String> {
     let config = gui_config_state.snapshot()?;
     Ok(GuiSettings::from(&config))
-}
-
-#[tauri::command]
-pub(crate) fn resolve_api_access_remarks(
-    queries: Vec<ApiAccessRemarkQuery>,
-    gui_config_state: tauri::State<'_, GuiConfigState>,
-) -> Result<Vec<String>, String> {
-    let config = gui_config_state.snapshot()?;
-    queries
-        .into_iter()
-        .map(|query| {
-            validate_api_access_provider_section(&query.provider_section)?;
-            Ok(query
-                .api_keys
-                .iter()
-                .filter_map(|key| api_access_key_hash(key))
-                .find_map(|hash| {
-                    config.api_access_remarks.iter().find(|entry| {
-                        entry.provider_section == query.provider_section
-                            && entry.api_key_hash == hash
-                    })
-                })
-                .map(|entry| entry.remark.clone())
-                .unwrap_or_default())
-        })
-        .collect()
-}
-
-#[tauri::command]
-pub(crate) fn save_api_access_remark(
-    update: ApiAccessRemarkUpdate,
-    gui_config_state: tauri::State<'_, GuiConfigState>,
-) -> Result<(), String> {
-    validate_api_access_provider_section(&update.provider_section)?;
-    let remark = update.remark.trim().to_string();
-    validate_api_key_remark(&remark)?;
-    let previous_hashes = update
-        .previous_api_keys
-        .iter()
-        .filter_map(|key| api_access_key_hash(key))
-        .collect::<HashSet<_>>();
-    let next_hashes = update
-        .api_keys
-        .iter()
-        .filter_map(|key| api_access_key_hash(key))
-        .collect::<HashSet<_>>();
-    let hashes_to_replace = previous_hashes
-        .union(&next_hashes)
-        .cloned()
-        .collect::<HashSet<_>>();
-    let provider_section = update.provider_section;
-
-    gui_config_state.update(|config| {
-        config.api_access_remarks.retain(|entry| {
-            entry.provider_section != provider_section
-                || !hashes_to_replace.contains(&entry.api_key_hash)
-        });
-        if !remark.is_empty() {
-            config
-                .api_access_remarks
-                .extend(next_hashes.iter().map(|hash| GuiApiAccessRemark {
-                    provider_section: provider_section.clone(),
-                    api_key_hash: hash.clone(),
-                    remark: remark.clone(),
-                }));
-        }
-        Ok(())
-    })?;
-    Ok(())
 }
 
 #[tauri::command]

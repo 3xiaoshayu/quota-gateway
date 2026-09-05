@@ -10,7 +10,8 @@
 // Only the executable, the version marker and the bundled core archive are
 // copied, so the run never touches bin-work's real config.yaml or auth files;
 // the app writes a fresh config into the sandbox. Set E2E_PORTABLE_DIR to test
-// another portable directory.
+// another portable directory, and E2E_SCREENSHOT_DIR to keep a PNG of every
+// page for eyeballing a restyle.
 import { spawn } from "node:child_process";
 import fs from "node:fs";
 import http from "node:http";
@@ -22,6 +23,7 @@ import { chromium } from "playwright-core";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const source = path.resolve(process.env.E2E_PORTABLE_DIR || path.join(root, "bin-work"));
+const screenshotDir = process.env.E2E_SCREENSHOT_DIR ? path.resolve(process.env.E2E_SCREENSHOT_DIR) : null;
 const STARTUP_TIMEOUT_MS = 60_000;
 const CORE_TIMEOUT_MS = 120_000;
 const STEP_TIMEOUT_MS = 30_000;
@@ -214,6 +216,10 @@ async function main() {
       // to surface errors before moving on.
       await new Promise((resolve) => setTimeout(resolve, 1500));
       if (await page.locator(".close-dialog-backdrop").count()) throw new Error("the close dialog appeared without a close request");
+      if (screenshotDir) {
+        fs.mkdirSync(screenshotDir, { recursive: true });
+        await page.screenshot({ path: path.join(screenshotDir, `${NAV_PAGES[index]}.png`), fullPage: true });
+      }
       log(`${NAV_PAGES[index]} page renders`);
     }
 

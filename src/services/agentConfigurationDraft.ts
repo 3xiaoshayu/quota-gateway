@@ -8,8 +8,7 @@ export type AgentConfigurationClientId =
   | 'deepseek-harness'
   | 'zcode'
   | 'kimi-code'
-  | 'grok-build'
-  | 'pi';
+  | 'grok-build';
 
 export type AgentConfigurationModificationState = 'unconfigured' | 'applied' | 'invalid';
 
@@ -92,7 +91,6 @@ export function resolveAgentConfigurationAction({
   appliedModelMappings,
 }: ResolveAgentConfigurationActionOptions): AgentConfigurationAction {
   if (modificationState !== 'applied') return 'apply';
-  if (client === 'pi') return 'close';
   if (
     (client === 'zcode' || client === 'kimi-code' || client === 'grok-build')
     && !configurationSynchronized

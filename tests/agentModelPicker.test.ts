@@ -254,8 +254,4 @@ describe('agent configuration update action', () => {
       },
     })).toBe('update');
   });
-
-  test('Pi never exposes the model update action', () => {
-    expect(appliedConfiguration('pi', 'model-b')).toBe('close');
-  });
 });

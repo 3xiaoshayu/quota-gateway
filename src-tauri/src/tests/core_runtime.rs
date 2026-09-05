@@ -126,40 +126,6 @@ fn core_process_state_tracks_and_releases_adopted_processes() {
 }
 
 #[test]
-fn successful_core_install_remains_successful_when_restart_succeeds() {
-    let result = combine_install_and_restart_results(Ok("installed"), Ok(()));
-    assert_eq!(result.unwrap(), "installed");
-}
-
-#[test]
-fn successful_core_install_reports_automatic_restart_failure() {
-    let result = combine_install_and_restart_results(Ok("installed"), Err("port busy".into()));
-    assert_eq!(
-        result.unwrap_err(),
-        "内核已安装，但自动恢复运行失败: port busy"
-    );
-}
-
-#[test]
-fn failed_core_install_keeps_the_install_error_after_runtime_is_restored() {
-    let result =
-        combine_install_and_restart_results::<()>(Err("download cancelled".into()), Ok(()));
-    assert_eq!(result.unwrap_err(), "download cancelled");
-}
-
-#[test]
-fn failed_core_install_reports_restart_failure_too() {
-    let result = combine_install_and_restart_results::<()>(
-        Err("checksum mismatch".into()),
-        Err("port busy".into()),
-    );
-    assert_eq!(
-        result.unwrap_err(),
-        "checksum mismatch；自动恢复原内核运行状态也失败: port busy"
-    );
-}
-
-#[test]
 fn replacing_a_core_preserves_only_regular_bundled_assets() {
     let root = agent_test_home("bundled-assets");
     let source = root.join("source");
@@ -402,23 +368,3 @@ fn selected_source_archive_and_checksums_are_copied_into_the_installation() {
     fs::remove_dir_all(root).unwrap();
 }
 
-#[test]
-fn release_page_assets_parse_download_links_and_sha256() {
-    let html = r#"
-          <li><a href="/router-for-me/CLIProxyAPI/releases/download/v1.2.3/checksums.txt">checksums.txt</a></li>
-          <li><a href="/router-for-me/CLIProxyAPI/releases/download/v1.2.3/CLIProxyAPI_1.2.3_linux_amd64.tar.gz">asset</a>
-            <span>sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef</span>
-          </li>
-        "#;
-
-    let assets = parse_release_assets(html);
-    assert_eq!(assets.len(), 2);
-    assert_eq!(assets[1].name, "CLIProxyAPI_1.2.3_linux_amd64.tar.gz");
-    assert_eq!(
-        assets[1].digest.as_deref(),
-        Some("sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef")
-    );
-    assert!(assets[1]
-        .browser_download_url
-        .ends_with("/releases/download/v1.2.3/CLIProxyAPI_1.2.3_linux_amd64.tar.gz"));
-}

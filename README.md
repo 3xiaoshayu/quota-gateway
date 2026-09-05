@@ -17,7 +17,7 @@
 
 新手模式、版本管理与自动更新、API 接入（API Key 上游聚合）、使用记录与计费、Codex 会话管理、模型别名页、Kimi / xAI 登录、OpenClaw / Hermes / Pi / Kimi Code / Grok Build / DeepSeek Harness 智能体、多语言、日间主题、联系我们 / 赞助入口、GitHub 发布流水线。
 
-内核仍然从 `cpa-core/` 里随包附带的压缩包安装，不再联网检查新版本。
+内核仍然从 `cpa-core/` 里随包附带的压缩包安装，不再联网检查新版本。这些页面对应的后端也一并删了：应用自更新、从 GitHub / GitCode 下载内核、下载源与镜像设置、Pi 插件、模型别名命令，以及界面已不再调用的 Tauri 命令，保留的每个命令都有页面在用；样式表和文案只保留还在用的选择器和键（`scripts/prune-dead-css.mjs`、`scripts/prune-unused-i18n.mjs` 可以重跑）。
 
 ## 和 Quota Switcher 的分工
 

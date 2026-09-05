@@ -26,7 +26,7 @@ import {
 import { AuthFileManagementPage } from './AuthFileManagementPage';
 import { QuotaPage } from './QuotaPage';
 
-type OAuthProviderId = 'codex' | 'claude' | 'antigravity' | 'kimi' | 'xai';
+type OAuthProviderId = 'codex' | 'claude' | 'antigravity';
 type OAuthFlowStatus = 'idle' | 'waiting' | 'success' | 'error';
 
 type OAuthProviderState = {
@@ -71,9 +71,7 @@ const OAUTH_CALLBACK_SUPPORTED = new Set<OAuthProviderId>([
   'codex',
   'claude',
   'antigravity',
-  'xai',
 ]);
-const XAI_CALLBACK_URL = 'http://127.0.0.1:56121/callback';
 const OAUTH_POLL_INTERVAL_MS = 3000;
 const OAUTH_BROWSER_STORAGE_KEY = 'easy-cli-proxy-api.oauth-browser.v3';
 const NO_AUTO_OPEN_BROWSER_ID = 'none';
@@ -432,23 +430,10 @@ export function OAuthLoginPage() {
     const current = states[provider];
     const callbackInput = (current?.callbackUrl || '').trim();
     if (!callbackInput) {
-      showNotice(
-        provider === 'xai' ? t('oauth.pasteXaiCallback') : t('oauth.pasteCallback'),
-        'error',
-      );
+      showNotice(t('oauth.pasteCallback'), 'error');
       return;
     }
-
-    const redirectUrl = resolveCallbackUrl(provider, callbackInput, current?.state);
-    if (!redirectUrl) {
-      showNotice(
-        provider === 'xai'
-          ? t('oauth.invalidXaiCallback')
-          : t('oauth.invalidCallback'),
-        'error',
-      );
-      return;
-    }
+    const redirectUrl = callbackInput;
 
     updateProviderState(provider, {
       callbackSubmitting: true,
@@ -597,56 +582,4 @@ export function OAuthLoginPage() {
 
 function providerLabel(provider: OAuthProviderId) {
   return oauthProviders.find((item) => item.id === provider)?.name ?? provider;
-}
-
-function isAbsoluteUrl(value: string) {
-  try {
-    new URL(value);
-    return true;
-  } catch {
-    return false;
-  }
-}
-
-function readQueryLikeCallbackInput(value: string) {
-  const trimmed = value.trim();
-  if (!trimmed) return null;
-  const queryStart = trimmed.indexOf('?');
-  const hashStart = trimmed.indexOf('#');
-  const rawParams = queryStart >= 0
-    ? trimmed.slice(queryStart + 1)
-    : hashStart >= 0
-      ? trimmed.slice(hashStart + 1)
-      : trimmed;
-  if (!/(^|[&#?])(code|state|error)=/i.test(rawParams)) return null;
-  return new URLSearchParams(rawParams.replace(/^[?#]/, ''));
-}
-
-function buildXaiCallbackUrl(input: string, state?: string) {
-  const trimmed = input.trim();
-  if (!trimmed) return null;
-  if (isAbsoluteUrl(trimmed)) return trimmed;
-  const params = readQueryLikeCallbackInput(trimmed);
-  if (params) {
-    const callbackState = params.get('state')?.trim() || state?.trim();
-    if (!callbackState) return null;
-    const callbackUrl = new URL(XAI_CALLBACK_URL);
-    callbackUrl.searchParams.set('state', callbackState);
-    for (const key of ['code', 'error', 'error_description']) {
-      const value = params.get(key)?.trim();
-      if (value) callbackUrl.searchParams.set(key, value);
-    }
-    return callbackUrl.toString();
-  }
-  const code = (trimmed.match(/\bcode\s*[:=]\s*([^\s&]+)/i)?.[1] ?? trimmed).trim();
-  const callbackState = state?.trim();
-  if (!code || !callbackState) return null;
-  const callbackUrl = new URL(XAI_CALLBACK_URL);
-  callbackUrl.searchParams.set('code', code);
-  callbackUrl.searchParams.set('state', callbackState);
-  return callbackUrl.toString();
-}
-
-function resolveCallbackUrl(provider: OAuthProviderId, input: string, state?: string) {
-  return provider === 'xai' ? buildXaiCallbackUrl(input, state) : input.trim();
 }

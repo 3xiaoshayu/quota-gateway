@@ -2,7 +2,6 @@
 
 mod agents;
 mod app_settings;
-mod app_update;
 mod claude_catalog;
 mod codex_catalog;
 mod configuration_watcher;
@@ -24,7 +23,6 @@ use oauth_browser::*;
 
 use agents::*;
 use app_settings::*;
-use app_update::*;
 use core_config::*;
 use core_runtime::*;
 use flate2::read::GzDecoder;
@@ -40,11 +38,10 @@ use std::sync::atomic::{AtomicBool, Ordering};
 #[cfg(target_os = "macos")]
 use std::sync::Arc;
 use std::{
-    collections::HashSet,
     env, fs,
     fs::File,
     io::{self, Read, Seek, SeekFrom, Write},
-    net::{IpAddr, Ipv4Addr, SocketAddr, TcpStream, UdpSocket},
+    net::{IpAddr, SocketAddr, TcpStream},
     path::{Component, Path, PathBuf},
     process::{Child, Command, Stdio},
     sync::{LazyLock, Mutex},
@@ -69,41 +66,13 @@ use tokio_util::sync::CancellationToken;
 use tray::*;
 use zip::ZipArchive;
 
-const RELEASE_PAGE_URL: &str = "https://github.com/router-for-me/CLIProxyAPI/releases/latest";
-const RELEASE_ATOM_URL: &str = "https://github.com/router-for-me/CLIProxyAPI/releases.atom";
-const RELEASE_DOWNLOAD_PREFIX: &str =
-    "https://github.com/router-for-me/CLIProxyAPI/releases/download/";
-#[cfg(windows)]
-const APP_UPDATE_MANIFEST_URL: &str = "https://github.com/router-for-me/EasyCLIProxyAPI/releases/latest/download/portable-update-windows.json";
-#[cfg(target_os = "linux")]
-const APP_UPDATE_MANIFEST_URL: &str = "https://github.com/router-for-me/EasyCLIProxyAPI/releases/latest/download/portable-update-linux.json";
-// Legacy macOS clients contain an updater that cannot launch outside its signed app bundle.
-// A separate channel makes those clients fall back to a one-time manual installation.
-#[cfg(target_os = "macos")]
-const APP_UPDATE_MANIFEST_URL: &str = "https://github.com/router-for-me/EasyCLIProxyAPI/releases/latest/download/portable-update-darwin-v2.json";
-const APP_RELEASE_DOWNLOAD_PREFIX: &str =
-    "https://github.com/router-for-me/EasyCLIProxyAPI/releases/download/";
-#[cfg(windows)]
-const APP_UPDATE_MANIFEST_NAME: &str = "portable-update-windows.json";
-#[cfg(target_os = "linux")]
-const APP_UPDATE_MANIFEST_NAME: &str = "portable-update-linux.json";
-#[cfg(target_os = "macos")]
-const APP_UPDATE_MANIFEST_NAME: &str = "portable-update-darwin-v2.json";
 const CODEX_MODEL_CATALOG_URL: &str = "https://raw.githubusercontent.com/router-for-me/EasyCLIProxyAPI/main/src-tauri/resources/codex_models/model-catalog.json";
 const CODEX_MODEL_CATALOG_OVERRIDE_DIR: &str = "codex_models";
 const CODEX_MODEL_CATALOG_SOURCE_FILE: &str = "model-catalog.json";
 const MAX_CODEX_MODEL_CATALOG_BYTES: usize = 4 * 1024 * 1024;
-const APP_UPDATE_PROGRESS_EVENT: &str = "app-update-progress";
-const PORTABLE_APP_MANIFEST_FILE: &str = "portable-app.json";
-#[cfg(windows)]
-const PORTABLE_APP_BINARY: &str = "EasyCLIProxyAPI.exe";
-#[cfg(target_os = "linux")]
-const PORTABLE_APP_BINARY: &str = "EasyCLIProxyAPI";
 const CORE_INSTALL_PROGRESS_EVENT: &str = "core-install-progress";
 const CORE_STATUS_EVENT: &str = "core-status-changed";
 const CONFIG_FILES_CHANGED_EVENT: &str = "config-files-changed";
-const VERSION_DOWNLOAD_SOURCE_CHANGED_EVENT: &str = "version-download-source-changed";
-static VERSION_SOURCE_DETECTION_LOCK: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());
 #[cfg(target_os = "windows")]
 const WINDOWS_CLOSE_REQUEST_EVENT: &str = "windows-close-requested";
 const CORE_METADATA_FILE: &str = "cpa-gui-meta.json";
@@ -145,8 +114,6 @@ const DEEPSEEK_HARNESS_CREDENTIALS_FILE: &str = ".credentials.yaml";
 const PI_AGENT_ID: &str = "pi";
 const PI_AGENT_NAME: &str = "Pi";
 const PI_CLIPROXYAPI_PACKAGE: &str = "npm:@router-for-me/pi-cliproxyapi-provider";
-const PI_CLIPROXYAPI_NPM_LATEST_URL: &str =
-    "https://registry.npmjs.org/@router-for-me%2Fpi-cliproxyapi-provider/latest";
 const PI_CLIPROXYAPI_PROVIDER_ID: &str = "cliproxyapi";
 const PI_AGENT_CONFIG_FILE: &str = "cliproxyapi.json";
 const PI_AGENT_SETTINGS_FILE: &str = "settings.json";
@@ -279,18 +246,6 @@ struct CoreDownloadInner {
 }
 
 #[derive(Default)]
-struct AppUpdateState {
-    inner: Mutex<AppUpdateInner>,
-}
-
-#[derive(Default)]
-struct AppUpdateInner {
-    task: AppUpdateTask,
-    token: Option<CancellationToken>,
-    pending: Option<PendingAppUpdate>,
-}
-
-#[derive(Default)]
 struct CoreProcessState {
     child: Mutex<Option<Child>>,
     adopted_processes: Mutex<Vec<AdoptedCoreProcess>>,
@@ -404,142 +359,6 @@ struct CoreStatus {
     message: String,
 }
 
-#[derive(Serialize)]
-#[serde(rename_all = "camelCase")]
-struct CoreLatest {
-    version: String,
-    asset_name: String,
-}
-
-#[derive(Clone, Serialize)]
-#[serde(rename_all = "camelCase")]
-struct AppUpdateInfo {
-    current_version: String,
-    latest_version: String,
-    update_available: bool,
-    release_url: String,
-    auto_update_supported: bool,
-    download_size_bytes: Option<u64>,
-    unsupported_reason: Option<String>,
-}
-
-#[derive(Clone, Debug, Deserialize)]
-#[serde(rename_all = "camelCase")]
-struct PortableUpdateManifest {
-    schema_version: u32,
-    version: String,
-    published_at: String,
-    release_url: String,
-    assets: std::collections::HashMap<String, PortableUpdateAsset>,
-    #[serde(default)]
-    full_assets: Option<std::collections::HashMap<String, PortableUpdateAsset>>,
-}
-
-#[derive(Clone, Debug, Deserialize)]
-#[serde(rename_all = "camelCase")]
-struct PortableUpdateAsset {
-    url: String,
-    #[serde(default)]
-    fallback_urls: Vec<String>,
-    sha256: String,
-    size_bytes: u64,
-}
-
-#[derive(Debug, Deserialize)]
-struct GitcodeRelease {
-    tag_name: String,
-}
-
-#[derive(Clone, Debug, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-struct PortableAppManifest {
-    schema_version: u32,
-    application: String,
-    version: String,
-    platform: String,
-    arch: String,
-    #[serde(default)]
-    auto_update: bool,
-}
-
-#[derive(Clone)]
-struct PendingAppUpdate {
-    version: String,
-    asset: PortableUpdateAsset,
-    #[cfg_attr(not(windows), allow(dead_code))]
-    arch: String,
-}
-
-#[derive(Clone, Debug, Serialize)]
-#[serde(rename_all = "camelCase")]
-struct AppUpdateTask {
-    running: bool,
-    cancellable: bool,
-    phase: String,
-    target_version: Option<String>,
-    downloaded_bytes: u64,
-    total_bytes: Option<u64>,
-    percent: Option<f64>,
-    message: Option<String>,
-}
-
-impl Default for AppUpdateTask {
-    fn default() -> Self {
-        Self {
-            running: false,
-            cancellable: false,
-            phase: "idle".to_string(),
-            target_version: None,
-            downloaded_bytes: 0,
-            total_bytes: None,
-            percent: None,
-            message: None,
-        }
-    }
-}
-
-#[cfg(any(windows, target_os = "linux"))]
-struct PortablePackagePayload {
-    manifest: PortableAppManifest,
-    core_archive_name: Option<String>,
-}
-
-#[cfg(any(windows, target_os = "linux"))]
-#[derive(Debug, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-struct PortableUpdateDescriptor {
-    parent_pid: u32,
-    current_exe: PathBuf,
-    staged_exe: PathBuf,
-    current_manifest: PathBuf,
-    staged_manifest: PathBuf,
-    backup_exe: PathBuf,
-    backup_manifest: PathBuf,
-    current_core_version: PathBuf,
-    staged_core_version: PathBuf,
-    backup_core_version: PathBuf,
-    staged_core_archive: PathBuf,
-    target_core_archive: PathBuf,
-    install_core_archive: bool,
-    ack_path: PathBuf,
-    work_dir: PathBuf,
-    target_version: String,
-}
-
-#[cfg(target_os = "macos")]
-#[derive(Debug, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-struct MacosUpdateDescriptor {
-    parent_pid: u32,
-    current_app: PathBuf,
-    staged_app: PathBuf,
-    backup_app: PathBuf,
-    executable_relative_path: PathBuf,
-    ack_path: PathBuf,
-    work_dir: PathBuf,
-    target_version: String,
-}
-
 #[derive(Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 struct BundledCoreInfo {
@@ -637,115 +456,6 @@ impl VersionDownloadSource {
         }
     }
 
-    fn from_str(value: &str) -> Option<Self> {
-        match value.trim() {
-            "github" => Some(Self::Github),
-            "gitcode" => Some(Self::Gitcode),
-            "gh-proxy" => Some(Self::GhProxy),
-            "gh-fast" => Some(Self::GhFast),
-            "custom" => Some(Self::Custom),
-            _ => None,
-        }
-    }
-
-    fn display_name(self) -> &'static str {
-        match self {
-            Self::Github => "GitHub",
-            Self::Gitcode => "GitCode",
-            Self::GhProxy => "gh-proxy.com",
-            Self::GhFast => "ghfast.top",
-            Self::Custom => "自定义镜像",
-        }
-    }
-
-    fn github_proxy_prefix(self) -> Option<&'static str> {
-        match self {
-            Self::GhProxy => Some("https://gh-proxy.com/"),
-            Self::GhFast => Some("https://ghfast.top/"),
-            Self::Custom => None,
-            _ => None,
-        }
-    }
-}
-
-#[derive(Clone, Debug, Eq, PartialEq)]
-struct VersionDownloadCandidate {
-    source: VersionDownloadSource,
-    custom_url: Option<String>,
-}
-
-impl VersionDownloadCandidate {
-    fn builtin(source: VersionDownloadSource) -> Self {
-        Self {
-            source,
-            custom_url: None,
-        }
-    }
-
-    fn custom(url: &str) -> Self {
-        Self {
-            source: VersionDownloadSource::Custom,
-            custom_url: Some(url.to_string()),
-        }
-    }
-
-    fn key(&self) -> String {
-        self.custom_url
-            .as_ref()
-            .map(|url| format!("custom:{url}"))
-            .unwrap_or_else(|| self.source.as_str().to_string())
-    }
-
-    fn display_name(&self) -> String {
-        self.custom_url
-            .as_ref()
-            .and_then(|url| reqwest::Url::parse(url).ok())
-            .and_then(|url| url.host_str().map(str::to_string))
-            .unwrap_or_else(|| self.source.display_name().to_string())
-    }
-
-    fn proxy_prefix(&self) -> Option<&str> {
-        self.custom_url
-            .as_deref()
-            .or_else(|| self.source.github_proxy_prefix())
-    }
-}
-
-fn version_source_url(source: &VersionDownloadCandidate, github_url: &str) -> String {
-    source
-        .proxy_prefix()
-        .map(|prefix| format!("{prefix}{github_url}"))
-        .unwrap_or_else(|| github_url.to_string())
-}
-
-fn version_download_source_candidates(
-    preferred: VersionDownloadCandidate,
-    gitcode_available: bool,
-    custom_mirrors: &[String],
-) -> Vec<VersionDownloadCandidate> {
-    let mut candidates = vec![
-        preferred,
-        VersionDownloadCandidate::builtin(VersionDownloadSource::Github),
-        VersionDownloadCandidate::builtin(VersionDownloadSource::Gitcode),
-        VersionDownloadCandidate::builtin(VersionDownloadSource::GhProxy),
-        VersionDownloadCandidate::builtin(VersionDownloadSource::GhFast),
-    ];
-    candidates.retain(|candidate| {
-        gitcode_available || candidate.source != VersionDownloadSource::Gitcode
-    });
-    candidates.extend(
-        custom_mirrors
-            .iter()
-            .map(|url| VersionDownloadCandidate::custom(url)),
-    );
-    candidates
-        .into_iter()
-        .fold(Vec::new(), |mut sources, source| {
-            if !sources.contains(&source) {
-                sources.push(source);
-            }
-            sources
-        })
 }
 
 fn normalize_custom_download_mirror_url(value: &str) -> Result<String, String> {
@@ -769,17 +479,6 @@ fn normalize_custom_download_mirror_url(value: &str) -> Result<String, String> {
 }
 
 impl GuiConfigFile {
-    fn selected_download_candidate(&self) -> VersionDownloadCandidate {
-        if self.download_source == VersionDownloadSource::Custom
-            && self
-                .custom_download_mirrors
-                .contains(&self.active_custom_download_mirror)
-        {
-            VersionDownloadCandidate::custom(&self.active_custom_download_mirror)
-        } else {
-            VersionDownloadCandidate::builtin(self.download_source)
-        }
-    }
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Deserialize)]
@@ -820,22 +519,6 @@ struct GuiApiKeyEntry {
 struct GuiApiAccessRemark {
     provider_section: String,
     api_key_hash: String,
-    remark: String,
-}
-
-#[derive(Deserialize)]
-#[serde(rename_all = "camelCase")]
-struct ApiAccessRemarkQuery {
-    provider_section: String,
-    api_keys: Vec<String>,
-}
-
-#[derive(Deserialize)]
-#[serde(rename_all = "camelCase")]
-struct ApiAccessRemarkUpdate {
-    provider_section: String,
-    previous_api_keys: Vec<String>,
-    api_keys: Vec<String>,
     remark: String,
 }
 
@@ -963,14 +646,6 @@ struct GuiSettings {
 
 #[derive(Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
-struct VersionSourceSettings {
-    source: String,
-    gitcode_available: bool,
-    custom_mirrors: Vec<String>,
-}
-
-#[derive(Clone, Serialize)]
-#[serde(rename_all = "camelCase")]
 struct SoftwareSettings {
     close_behavior: WindowsCloseBehavior,
     autostart_enabled: bool,
@@ -1036,14 +711,6 @@ struct AgentConfigActionResult {
     model: Option<String>,
     changed_files: Vec<String>,
     conflict_files: Vec<String>,
-}
-
-#[derive(Clone, Debug, Serialize)]
-#[serde(rename_all = "camelCase")]
-struct PiProviderUpdateStatus {
-    installed_version: Option<String>,
-    latest_version: Option<String>,
-    update_available: bool,
 }
 
 #[derive(Clone, Debug, Serialize)]
@@ -1115,59 +782,6 @@ struct CodexModelDefinition {
     context_window: Option<u64>,
     reasoning_levels: Vec<String>,
     supports_tools: Option<bool>,
-}
-
-#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
-#[serde(rename_all = "camelCase")]
-struct ThinkingAliasEntry {
-    source_model: String,
-    alias: String,
-    effort: Option<String>,
-    provider: String,
-    kind: String,
-    oauth_channel: Option<String>,
-}
-
-#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
-#[serde(rename_all = "camelCase")]
-struct SpeedAliasEntry {
-    source_model: String,
-    alias: String,
-    service_tier: String,
-    provider: String,
-    kind: String,
-    oauth_channel: Option<String>,
-}
-
-#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
-#[serde(rename_all = "camelCase")]
-struct ThinkingAliasSource {
-    id: String,
-    model: String,
-    display_name: Option<String>,
-    provider: String,
-    kind: String,
-    protocol: String,
-    reasoning_levels: Vec<String>,
-}
-
-#[derive(Clone, Debug, PartialEq, Eq)]
-enum ThinkingAliasSourceLocation {
-    Oauth {
-        channel: &'static str,
-        force_mapping: bool,
-    },
-    ConfigModel {
-        section: &'static str,
-        provider_index: usize,
-        model_index: usize,
-    },
-}
-
-#[derive(Clone, Debug, PartialEq, Eq)]
-struct ResolvedThinkingAliasSource {
-    source: ThinkingAliasSource,
-    location: ThinkingAliasSourceLocation,
 }
 
 #[derive(Clone, Serialize, Deserialize)]
@@ -1340,29 +954,6 @@ type AgentRecordExtension = (AgentModificationRecord, Vec<FileSnapshot>);
 
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
-struct GuiNetworkSettings {
-    port: u16,
-    allow_lan: bool,
-}
-
-#[derive(Deserialize)]
-#[serde(rename_all = "camelCase")]
-struct GuiNetworkRoutingSettings {
-    port: u16,
-    allow_lan: bool,
-    proxy_url: String,
-    routing_session_affinity: bool,
-    routing_session_affinity_ttl: String,
-    #[serde(default)]
-    disable_cooling: bool,
-    request_retry: u32,
-    max_retry_credentials: u32,
-    max_retry_interval: u32,
-    streaming_bootstrap_retries: u32,
-}
-
-#[derive(Deserialize)]
-#[serde(rename_all = "camelCase")]
 struct GuiNetworkEndpointSettings {
     host: String,
     port: u16,
@@ -1500,11 +1091,6 @@ struct CoreMetadata {
     installed_at_unix: u64,
 }
 
-struct DownloadedArchive {
-    size: u64,
-    sha256: String,
-}
-
 impl CoreDownloadState {
     fn start(&self, token: CancellationToken, version: Option<String>) -> Result<(), String> {
         let mut inner = self
@@ -1532,21 +1118,6 @@ impl CoreDownloadState {
         };
 
         Ok(())
-    }
-
-    fn cancel(&self) {
-        if let Ok(inner) = self.inner.lock() {
-            if let Some(token) = &inner.token {
-                token.cancel();
-            }
-        }
-    }
-
-    fn snapshot(&self) -> CoreInstallTask {
-        self.inner
-            .lock()
-            .map(|inner| inner.task.clone())
-            .unwrap_or_default()
     }
 
     fn progress(
@@ -1613,82 +1184,6 @@ impl CoreDownloadState {
         };
 
         let _ = window.emit(CORE_INSTALL_PROGRESS_EVENT, task);
-    }
-}
-
-impl AppUpdateState {
-    fn snapshot(&self) -> AppUpdateTask {
-        self.inner
-            .lock()
-            .map(|inner| inner.task.clone())
-            .unwrap_or_default()
-    }
-
-    fn set_pending(&self, pending: Option<PendingAppUpdate>, task: AppUpdateTask) {
-        if let Ok(mut inner) = self.inner.lock() {
-            inner.pending = pending;
-            if !inner.task.running {
-                inner.task = task;
-            }
-        }
-    }
-
-    fn start(&self, token: CancellationToken) -> Result<PendingAppUpdate, String> {
-        let mut inner = self
-            .inner
-            .lock()
-            .map_err(|_| "应用更新状态锁已损坏".to_string())?;
-        if inner.task.running {
-            return Err("已有应用更新任务正在运行".to_string());
-        }
-        let pending = inner
-            .pending
-            .clone()
-            .ok_or_else(|| "没有可安装的应用更新，请先检查更新".to_string())?;
-        inner.token = Some(token);
-        inner.task = AppUpdateTask {
-            running: true,
-            cancellable: true,
-            phase: "downloading".to_string(),
-            target_version: Some(pending.version.clone()),
-            downloaded_bytes: 0,
-            total_bytes: Some(pending.asset.size_bytes),
-            percent: Some(0.0),
-            message: None,
-        };
-        Ok(pending)
-    }
-
-    #[cfg(any(windows, target_os = "linux", target_os = "macos"))]
-    fn update_task<F>(&self, update: F) -> AppUpdateTask
-    where
-        F: FnOnce(&mut AppUpdateTask),
-    {
-        let Ok(mut inner) = self.inner.lock() else {
-            return AppUpdateTask::default();
-        };
-        update(&mut inner.task);
-        inner.task.clone()
-    }
-
-    fn finish(&self, phase: &str, message: Option<String>) -> AppUpdateTask {
-        let Ok(mut inner) = self.inner.lock() else {
-            return AppUpdateTask::default();
-        };
-        inner.task.running = false;
-        inner.task.cancellable = false;
-        inner.task.phase = phase.to_string();
-        inner.task.message = message;
-        inner.token = None;
-        inner.task.clone()
-    }
-
-    fn cancel(&self) {
-        if let Ok(inner) = self.inner.lock() {
-            if let Some(token) = &inner.token {
-                token.cancel();
-            }
-        }
     }
 }
 
@@ -1898,32 +1393,6 @@ impl GuiConfigState {
         Ok(config)
     }
 
-    fn update_network(&self, port: u16, allow_lan: bool) -> Result<GuiConfigFile, String> {
-        self.update(|config| {
-            config.port = port;
-            config.allow_lan = allow_lan;
-            config.host = if allow_lan { "0.0.0.0" } else { "127.0.0.1" }.to_string();
-            Ok(())
-        })
-    }
-
-    fn update_network_routing(&self, settings: &GuiConfigFile) -> Result<GuiConfigFile, String> {
-        self.update(|config| {
-            config.port = settings.port;
-            config.allow_lan = settings.allow_lan;
-            config.host = settings.host.clone();
-            config.proxy_url = settings.proxy_url.clone();
-            config.routing_session_affinity = settings.routing_session_affinity;
-            config.routing_session_affinity_ttl = settings.routing_session_affinity_ttl.clone();
-            config.disable_cooling = settings.disable_cooling;
-            config.request_retry = settings.request_retry;
-            config.max_retry_credentials = settings.max_retry_credentials;
-            config.max_retry_interval = settings.max_retry_interval;
-            config.streaming_bootstrap_retries = settings.streaming_bootstrap_retries;
-            Ok(())
-        })
-    }
-
     fn update_network_endpoint(&self, settings: &GuiConfigFile) -> Result<GuiConfigFile, String> {
         self.update(|config| {
             config.host = settings.host.clone();
@@ -1991,57 +1460,6 @@ impl GuiConfigState {
             config.locale = normalize_app_locale(&locale).to_string();
             Ok(())
         })
-    }
-
-    fn set_download_source(
-        &self,
-        download_source: VersionDownloadSource,
-    ) -> Result<GuiConfigFile, String> {
-        self.set_download_candidate(VersionDownloadCandidate::builtin(download_source))
-    }
-
-    fn set_download_candidate(
-        &self,
-        candidate: VersionDownloadCandidate,
-    ) -> Result<GuiConfigFile, String> {
-        self.update(|config| {
-            if let Some(url) = &candidate.custom_url {
-                if !config.custom_download_mirrors.contains(url) {
-                    return Err("自定义镜像不存在".to_string());
-                }
-                config.active_custom_download_mirror = url.clone();
-            }
-            config.download_source = candidate.source;
-            config.prefer_gitcode_downloads = candidate.source == VersionDownloadSource::Gitcode;
-            Ok(())
-        })
-    }
-
-    fn switch_download_source_after_failure(
-        &self,
-        expected_source: &VersionDownloadCandidate,
-        fallback_source: &VersionDownloadCandidate,
-    ) -> Result<Option<GuiConfigFile>, String> {
-        let mut current = self
-            .inner
-            .lock()
-            .map_err(|_| "GUI 配置状态锁已损坏".to_string())?;
-        if current.selected_download_candidate() != *expected_source
-            || expected_source == fallback_source
-        {
-            return Ok(None);
-        }
-
-        let mut config = current.clone();
-        config.download_source = fallback_source.source;
-        if let Some(url) = &fallback_source.custom_url {
-            config.active_custom_download_mirror = url.clone();
-        }
-        config.prefer_gitcode_downloads = fallback_source.source == VersionDownloadSource::Gitcode;
-        sanitize_gui_config(&mut config)?;
-        write_gui_config(&config)?;
-        *current = config.clone();
-        Ok(Some(config))
     }
 
     fn set_window_size(&self, size: SavedWindowSize) -> Result<GuiConfigFile, String> {
@@ -2206,41 +1624,7 @@ impl From<&GuiConfigFile> for CoreConfigView {
     }
 }
 
-#[derive(Deserialize)]
-struct GithubRelease {
-    tag_name: String,
-    assets: Vec<GithubAsset>,
-}
-
-#[derive(Deserialize)]
-struct GithubAsset {
-    name: String,
-    browser_download_url: String,
-    #[serde(default)]
-    fallback_download_urls: Vec<String>,
-    size: Option<u64>,
-    digest: Option<String>,
-}
-
 fn main() {
-    #[cfg(any(windows, target_os = "linux", target_os = "macos"))]
-    {
-        let mut args = env::args_os();
-        while let Some(argument) = args.next() {
-            if argument == "--portable-update-helper" {
-                let result = args
-                    .next()
-                    .map(PathBuf::from)
-                    .ok_or_else(|| "应用更新助手缺少描述文件".to_string())
-                    .and_then(|path| run_portable_update_helper(&path));
-                if let Err(error) = result {
-                    eprintln!("{error}");
-                }
-                return;
-            }
-        }
-    }
-
     let _instance_guard = match acquire_app_instance_guard() {
         Ok(guard) => guard,
         Err(error) => {
@@ -2249,7 +1633,6 @@ fn main() {
         }
     };
 
-    let portable_update_ack = portable_update_ack_argument();
     let gui_config = match load_or_create_gui_config() {
         Ok(config) => config,
         Err(error) => {
@@ -2280,7 +1663,6 @@ fn main() {
                 .build(),
         )
         .manage(CoreDownloadState::default())
-        .manage(AppUpdateState::default())
         .manage(CoreProcessState::new(gui_config.start_core_on_launch))
         .manage(GuiConfigState::new(gui_config))
         .manage(MainWindowSizeState::new(initial_window_size))
@@ -2440,20 +1822,11 @@ fn main() {
                 }
             });
 
-            if let Some(ack_path) = portable_update_ack.as_ref() {
-                fs::write(ack_path, env!("CARGO_PKG_VERSION").as_bytes())
-                    .map_err(|error| format!("写入应用更新启动确认失败: {error}"))?;
-            }
-
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
-            health_check,
-            detect_core_platform,
             get_core_status,
             get_gui_settings,
-            resolve_api_access_remarks,
-            save_api_access_remark,
             set_app_locale,
             resolve_windows_close_request,
             get_software_settings,
@@ -2461,34 +1834,14 @@ fn main() {
             get_agent_config_statuses,
             refresh_agent_config_statuses,
             get_agent_models,
-            check_pi_provider_update,
-            install_pi_provider,
-            update_pi_provider,
-            repair_pi_provider,
-            uninstall_pi_provider,
             check_codex_oauth_login,
-            update_codex_model_catalog,
-            get_thinking_aliases,
-            get_model_alias_sources,
-            get_thinking_alias_sources,
-            create_thinking_alias,
-            delete_thinking_alias,
-            get_speed_aliases,
-            get_speed_alias_sources,
-            create_speed_alias,
-            delete_speed_alias,
             apply_agent_config,
             close_agent_config_modification,
             reset_agent_config_to_default,
             clear_codex_config,
-            set_agent_config_enabled,
-            update_agent_config,
             launch_agent,
             restart_codex_app,
             restart_opencode_app,
-            get_lan_ipv4,
-            save_gui_settings,
-            save_network_routing_settings,
             save_network_endpoint_settings,
             save_retry_settings,
             save_session_routing_settings,
@@ -2496,42 +1849,21 @@ fn main() {
             save_core_tls_settings,
             get_core_config_settings,
             save_core_logging_settings,
-            set_core_request_log,
             add_core_api_key,
             update_core_api_key,
             delete_core_api_key,
             set_core_management_secret_key,
-            clear_core_management_secret_key,
             management_api::management_request,
             management_api::upload_auth_file,
             management_api::open_auth_files_directory,
             management_api::open_core_logs_directory,
-            set_core_plugins_enabled,
             set_core_routing_strategy,
-            set_core_proxy_url,
-            set_core_session_affinity,
-            set_core_session_affinity_ttl,
             management_api::start_oauth_login,
             management_api::get_oauth_status,
             management_api::submit_oauth_callback,
             list_oauth_browsers,
             open_oauth_url,
             open_external_url,
-            get_version_source_settings,
-            set_download_source,
-            add_custom_download_mirror,
-            remove_custom_download_mirror,
-            set_prefer_gitcode_downloads,
-            check_app_update,
-            get_app_update_task,
-            start_app_update,
-            cancel_app_update,
-            check_latest_core,
-            detect_bundled_core,
-            install_core_version,
-            install_bundled_core,
-            cancel_core_install,
-            get_core_install_task,
             start_core_process,
             stop_core_process,
             restart_core_process
