@@ -1424,6 +1424,18 @@ fn desktop_application_binaries_are_not_used_for_cli_version_probes() {
 }
 
 #[test]
+fn a_second_zcode_desktop_binary_on_path_is_not_treated_as_a_cli() {
+    // A portable ZCode.exe on PATH used to be probed with --version, which
+    // opened the app, killed it at the timeout, and looped through the
+    // config watcher.
+    assert!(is_zcode_desktop_binary(Path::new("E:/zcode/ZCode.exe")));
+    assert!(is_zcode_desktop_binary(Path::new("C:/Users/me/AppData/Local/Programs/ZCode/zcode.EXE")));
+    assert!(!is_zcode_desktop_binary(Path::new("C:/Users/me/AppData/Roaming/npm/zcode.cmd")));
+    assert!(!is_zcode_desktop_binary(Path::new("/usr/local/bin/zcode")));
+    assert!(!is_zcode_desktop_binary(Path::new("C:/tools/zcode-cli.exe")));
+}
+
+#[test]
 fn claude_model_lists_mark_yaml_aliases_when_api_returns_only_model_ids() {
     let mut models = test_agent_models(&[
         "gpt-original",

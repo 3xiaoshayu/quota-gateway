@@ -947,6 +947,11 @@ pub(crate) fn inspect_agent_config(
     let cli_version = if client == AgentClient::ZCode {
         find_named_agent_executable(home, &["zcode"])
             .filter(|path| executable.as_ref() != Some(path))
+            // A second copy of the desktop app on PATH (a portable ZCode.exe)
+            // is not a CLI: `ZCode.exe --version` opens its window, which the
+            // probe then kills at the timeout, and the app's own startup
+            // writes re-trigger detection, so the window flaps forever.
+            .filter(|path| !is_zcode_desktop_binary(path))
             .as_deref()
             .and_then(|path| read_agent_version(path, home))
     } else if should_probe_primary_agent_executable_version(client) {
@@ -1030,6 +1035,20 @@ pub(crate) fn inspect_agent_config(
         warnings,
         error,
     }
+}
+
+// The ZCode desktop binary is `ZCode.exe`; its CLI, when one is installed, is a
+// script shim (`zcode.cmd`, `zcode`). Only the shim may be asked for --version.
+pub(crate) fn is_zcode_desktop_binary(path: &Path) -> bool {
+    let is_exe = path
+        .extension()
+        .and_then(|extension| extension.to_str())
+        .is_some_and(|extension| extension.eq_ignore_ascii_case("exe"));
+    let is_zcode = path
+        .file_stem()
+        .and_then(|stem| stem.to_str())
+        .is_some_and(|stem| stem.eq_ignore_ascii_case("zcode"));
+    is_exe && is_zcode
 }
 
 pub(crate) fn agent_installation_detected(
@@ -2012,9 +2031,10 @@ pub(crate) fn read_codex_app_installation_version(
                 let _ = app_id;
                 read_windows_codex_store_version()
             }
-            CodexAppTarget::Application(path) => {
-                read_windows_executable_version(path).or_else(|| read_agent_version(path, _home))
-            }
+            // A desktop app started with --version just opens its window; the
+            // probe would then kill it after the timeout, over and over. Only
+            // the version resource is consulted.
+            CodexAppTarget::Application(path) => read_windows_executable_version(path),
         }
     }
     #[cfg(target_os = "macos")]
@@ -2032,9 +2052,12 @@ pub(crate) fn read_codex_app_installation_version(
 pub(crate) fn read_zcode_app_version(home: &Path) -> Option<String> {
     #[cfg(target_os = "windows")]
     {
-        find_zcode_desktop_executable(home).and_then(|path| {
-            read_windows_executable_version(&path).or_else(|| read_agent_version(&path, home))
-        })
+        // ZCode.exe is a desktop app: `ZCode.exe --version` opens its window,
+        // the probe kills it at the timeout, ZCode's startup rewrites its own
+        // files, the config watcher fires, and the cycle repeats. Read the
+        // version resource only; installation is detected from the file.
+        find_zcode_desktop_executable(home)
+            .and_then(|path| read_windows_executable_version(&path))
     }
     #[cfg(target_os = "macos")]
     {
