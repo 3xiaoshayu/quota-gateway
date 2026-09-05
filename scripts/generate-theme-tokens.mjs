@@ -72,8 +72,15 @@ function semanticFor(h) {
 
 function mapColor(hex) {
   const { h, s, l } = hsl(hex);
-  // Warm greys in the original are neutrals; only clearly tinted colours are semantic.
-  const tinted = s > 0.22 && !(h >= 20 && h < 60 && s < 0.32);
+  // Warm greys and the near-white creams upstream used for panels and hover
+  // fills are neutrals; only clearly tinted colours are semantic. A real
+  // warning yellow (#fff7e9) is fully saturated, a cream (#faf8f2) is not.
+  const warm = h >= 20 && h < 60;
+  const cream = warm && l > 0.93 && s >= 0.32 && s < 0.6;
+  // Creams were inner panels and hover fills on a white card; on a dark
+  // surface that layer is the translucent fill, one step lighter than the card.
+  if (cream) return palette.fill;
+  const tinted = s > 0.22 && !(warm && s < 0.32);
   if (tinted) {
     const colour = semanticFor(h);
     if (l < 0.45) return colour;
@@ -102,6 +109,9 @@ const overrides = {
   fff: palette.surface,
   ffffff: palette.surface,
   fffdf8: palette.surface,
+  // Upstream marked a configured agent with a golden dot; here "configured"
+  // is the accent, the same blue Quota Switcher uses for the current account.
+  bf8a43: palette.accent,
 };
 
 const lines = originals.map(([name, hex]) => {

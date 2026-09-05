@@ -40,7 +40,7 @@
   --theme-b6d3bd: rgba(48, 209, 88, 0.32);
   --theme-b8d1bb: rgba(255, 255, 255, 0.22);
   --theme-bdb5a9: rgba(255, 255, 255, 0.22);
-  --theme-bf8a43: #ff9f0a;
+  --theme-bf8a43: #0a84ff;
   --theme-c77b30: #ff9f0a;
   --theme-c9c4ba: rgba(255, 255, 255, 0.22);
   --theme-c9d6e2: rgba(10, 132, 255, 0.18);
@@ -68,10 +68,10 @@
   --theme-f3f8f4: rgba(48, 209, 88, 0.12);
   --theme-f4f1ea: #242426;
   --theme-f4f2ec: #242426;
-  --theme-f6f2ec: rgba(255, 159, 10, 0.12);
-  --theme-f8f5ef: rgba(255, 159, 10, 0.12);
-  --theme-faf8f2: rgba(255, 159, 10, 0.12);
-  --theme-faf8f4: rgba(255, 159, 10, 0.12);
+  --theme-f6f2ec: rgba(255, 255, 255, 0.055);
+  --theme-f8f5ef: rgba(255, 255, 255, 0.055);
+  --theme-faf8f2: rgba(255, 255, 255, 0.055);
+  --theme-faf8f4: rgba(255, 255, 255, 0.055);
   --theme-faf9f5: #131315;
   --theme-fdf1ee: rgba(255, 69, 58, 0.12);
   --theme-fff: #1c1c1e;

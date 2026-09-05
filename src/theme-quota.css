@@ -268,6 +268,43 @@ textarea {
   box-shadow: 0 0 0 3px rgba(255, 69, 58, 0.16);
 }
 
+/* WebView2 paints a native menulist in the Windows light theme whatever the
+   author background says; draw the control ourselves instead. */
+select,
+select.config-network-input,
+.oauth-browser-picker select,
+.auth-files-toolbar select {
+  appearance: none;
+  -webkit-appearance: none;
+  padding-right: 30px;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%239d9da5' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 10px center;
+  color: var(--qg-label);
+}
+
+.oauth-browser-picker select {
+  border-color: var(--qg-fill-2);
+  background-color: var(--qg-fill);
+}
+
+select option {
+  background: var(--qg-surface);
+  color: var(--qg-label);
+}
+
+/* The generic monospace family resolves to a CJK face on a zh-CN Windows
+   WebView; name the fonts so URLs and keys keep the Quota Switcher look. */
+code,
+kbd,
+pre,
+.client-api-value-row code {
+  font-family: 'Cascadia Mono', Consolas, 'Courier New', monospace;
+  font-size: 12.5px;
+  letter-spacing: 0;
+  font-variant-numeric: tabular-nums;
+}
+
 button:focus-visible,
 input:focus-visible,
 select:focus-visible,
