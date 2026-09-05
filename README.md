@@ -33,8 +33,11 @@ bun run check          # tsc
 bun test               # 前端单测
 cd src-tauri; cargo test; cd ..
 .\build.ps1            # 编译并整理到 bin-work\
+bun run test:e2e       # 把 bin-work 复制到临时目录真的跑起来，装内置内核、走完四页
 .\run.ps1              # 运行 bin-work\Quota Gateway.exe
 ```
+
+`test:e2e` 只复制可执行文件和内置内核压缩包，不碰 `bin-work` 里真实的配置和账号；内核起在空闲端口，跑完整个临时目录连进程一起清掉。正在运行的 Quota Gateway 不用关。
 
 `build.ps1` 会把 `cpa-core\CLIProxyAPI_<版本>_windows_amd64.zip` 随包放进 `bin-work\cpa-core\`（版本号见 `core-version.txt`）；本地没有这个压缩包时从 GitHub Releases 下载一次并校验 SHA-256。
 
