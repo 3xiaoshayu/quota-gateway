@@ -146,6 +146,7 @@ async function main() {
   });
 
   const problems = [];
+  let probingCsp = false;
   let browser = null;
   let failed = false;
   try {
@@ -162,13 +163,33 @@ async function main() {
     log(`window url ${page.url()}`);
     page.on("pageerror", (error) => problems.push(`pageerror: ${error.message}`));
     page.on("console", (message) => {
-      if (message.type() === "error") problems.push(`console.error: ${message.text()}`);
+      if (message.type() !== "error") return;
+      if (probingCsp && /Content Security Policy|Refused to execute inline script/i.test(message.text())) return;
+      problems.push(`console.error: ${message.text()}`);
     });
 
     await page.waitForSelector(".app-shell", { timeout: STARTUP_TIMEOUT_MS });
     const nav = page.locator("nav.nav-section button");
     await waitFor(async () => (await nav.count()) === NAV_PAGES.length, STEP_TIMEOUT_MS, `${NAV_PAGES.length} navigation entries`);
     log("shell rendered");
+
+    // A build that lost its Content-Security-Policy would still render fine,
+    // so probe the policy itself. Code run over the DevTools protocol is
+    // exempt from CSP, but a <script> element it inserts is not: with
+    // script-src 'self' the inline script must be refused. Chromium logs that
+    // refusal as a console error, the one expected error in this run.
+    probingCsp = true;
+    const inlineScriptRan = await page.evaluate(() => new Promise((resolve) => {
+      const script = document.createElement("script");
+      script.textContent = "window.__e2eInlineScriptRan = true;";
+      document.head.appendChild(script);
+      setTimeout(() => resolve(window.__e2eInlineScriptRan === true), 300);
+    }));
+    probingCsp = false;
+    if (inlineScriptRan) {
+      throw new Error("the window has no effective Content-Security-Policy: an inline script was allowed to run");
+    }
+    log("content security policy is enforced");
 
     // The bundled core is unpacked and started on launch; OAuth and agent
     // pages unlock once it reports running.
