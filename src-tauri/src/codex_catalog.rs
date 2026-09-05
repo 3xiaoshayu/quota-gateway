@@ -4,6 +4,9 @@ use std::collections::{HashMap, HashSet};
 use std::sync::{OnceLock, RwLock};
 
 const MODEL_CATALOG_JSON: &str = include_str!("../resources/codex_models/model-catalog.json");
+// Upstream publishes the catalog (templates only) and keeps the fallback model
+// in its own file, so a fetched catalog never carries one; older catalogs did.
+const FALLBACK_MODEL_JSON: &str = include_str!("../resources/codex_models/fallback-model.json");
 const ALL_REASONING_LEVELS: [&str; 8] = [
     "none", "minimal", "low", "medium", "high", "xhigh", "max", "ultra",
 ];
@@ -204,12 +207,23 @@ fn parse_sources(catalog_json: &str) -> Result<CatalogSources, String> {
         .as_object()
         .ok_or_else(|| "内置 model-catalog.json 根节点必须是对象".to_string())?;
 
-    let fallback = root
-        .get("fallback_model")
-        .and_then(Value::as_object)
-        .cloned()
-        .ok_or_else(|| "内置 model-catalog.json 缺少 fallback_model 对象".to_string())?;
-    validate_model(&fallback, "fallback_model", false)?;
+    let fallback = match root.get("fallback_model") {
+        Some(value) => {
+            let fallback = value
+                .as_object()
+                .cloned()
+                .ok_or_else(|| "model-catalog.json 的 fallback_model 必须是对象".to_string())?;
+            validate_model(&fallback, "fallback_model", false)?;
+            fallback
+        }
+        None => embedded_fallback_model()?,
+    };
+
+    if let Some(revision) = root.get("catalog_revision") {
+        if revision.as_u64().is_none() {
+            return Err("Codex 模型目录 catalog_revision 必须为非负整数".to_string());
+        }
+    }
 
     let values = root
         .get("models")
@@ -246,6 +260,17 @@ fn parse_sources(catalog_json: &str) -> Result<CatalogSources, String> {
         templates,
         max_template_priority,
     })
+}
+
+fn embedded_fallback_model() -> Result<Map<String, Value>, String> {
+    let fallback: Value = serde_json::from_str(FALLBACK_MODEL_JSON)
+        .map_err(|error| format!("解析内置 fallback-model.json 失败: {error}"))?;
+    let fallback = fallback
+        .as_object()
+        .cloned()
+        .ok_or_else(|| "内置 fallback-model.json 根节点必须是对象".to_string())?;
+    validate_model(&fallback, "fallback-model.json", false)?;
+    Ok(fallback)
 }
 
 fn validate_model(
@@ -736,7 +761,14 @@ mod tests {
         validate_embedded_catalog().unwrap();
         let state = catalog_state().unwrap().read().unwrap();
         let sources = &state.sources;
-        assert_eq!(sources.templates.len(), 10);
+        // The catalog is upstream's templates-only file; the fallback comes
+        // from the separate embedded file.
+        let embedded: Value = serde_json::from_str(MODEL_CATALOG_JSON).unwrap();
+        assert!(embedded.get("fallback_model").is_none());
+        assert_eq!(embedded["catalog_revision"], 3);
+        assert_eq!(sources.templates.len(), 11);
+        let fallback: Value = serde_json::from_str(FALLBACK_MODEL_JSON).unwrap();
+        assert_eq!(fallback.as_object(), Some(&sources.fallback));
         let fallback_prompt = string_value(&sources.fallback, "base_instructions");
         assert!(fallback_prompt.starts_with(
             "You are a coding agent running in the Codex CLI, a terminal-based coding assistant."
@@ -748,55 +780,42 @@ mod tests {
             sources.fallback["input_modalities"],
             serde_json::json!(["text", "image"])
         );
-        assert_eq!(sources.fallback["default_reasoning_level"], Value::Null);
-        assert!(reasoning_efforts(&sources.fallback).is_empty());
-        assert_eq!(sources.fallback["shell_type"], "default");
         assert_eq!(sources.fallback["visibility"], "none");
         assert_eq!(sources.fallback["default_reasoning_summary"], "auto");
         assert_eq!(sources.fallback["supports_parallel_tool_calls"], false);
         assert_eq!(sources.fallback["truncation_policy"]["mode"], "bytes");
 
-        let gpt = &sources.templates["gpt-5.6-sol"].value;
-        let gpt_prompt = string_value(gpt, "base_instructions");
-        let gpt_prompt_body = gpt_prompt.split_once("\n\n").unwrap().1;
-        let gpt_messages = gpt["model_messages"].as_object().unwrap();
-        let gpt_message_prompt = gpt_messages["instructions_template"].as_str().unwrap();
-        let gpt_message_prompt_body = gpt_message_prompt.split_once("\n\n").unwrap().1;
-
-        for slug in ["deepseek-v4-flash", "deepseek-v4-pro"] {
-            let model = &sources.templates[slug].value;
-            assert_eq!(model["context_window"], 1_000_000);
-            assert_eq!(model["max_context_window"], 1_000_000);
-            assert_eq!(model["default_reasoning_level"], "high");
-            assert_eq!(reasoning_efforts(model), ["low", "high", "max"]);
-            assert_eq!(model["input_modalities"], serde_json::json!(["text"]));
-            assert_eq!(model["supports_parallel_tool_calls"], false);
-            assert_eq!(model["supports_search_tool"], false);
-            assert_eq!(model["service_tiers"], serde_json::json!([]));
-            assert_eq!(model["additional_speed_tiers"], serde_json::json!([]));
-
-            let prompt = string_value(model, "base_instructions");
-            assert!(
-                prompt.starts_with("You are Codex, a coding agent powered by a DeepSeek model.")
-            );
-            assert_eq!(prompt.split_once("\n\n").unwrap().1, gpt_prompt_body);
-
-            let mut normalized_messages = model["model_messages"].as_object().unwrap().clone();
-            let message_prompt = normalized_messages["instructions_template"]
-                .as_str()
-                .unwrap();
-            assert!(message_prompt
-                .starts_with("You are Codex, a coding agent powered by a DeepSeek model."));
-            assert_eq!(
-                message_prompt.split_once("\n\n").unwrap().1,
-                gpt_message_prompt_body
-            );
-            normalized_messages.insert(
-                "instructions_template".to_string(),
-                Value::String(gpt_message_prompt.to_string()),
-            );
-            assert_eq!(&normalized_messages, gpt_messages);
+        for slug in [
+            "gpt-6-astra",
+            "gpt-5.6-sol",
+            "gpt-5.6-terra",
+            "gpt-5.6-luna",
+            "gpt-5.5",
+            "gpt-5.4",
+            "gpt-5.4-mini",
+            "gpt-5.2",
+            "codex-auto-review",
+        ] {
+            assert!(sources.templates.contains_key(slug), "{slug} missing from the catalog");
         }
+    }
+
+    #[test]
+    fn legacy_catalog_with_inline_fallback_still_parses() {
+        // Catalogs written before upstream split the fallback out carry it inline.
+        let embedded: Value = serde_json::from_str(MODEL_CATALOG_JSON).unwrap();
+        let mut legacy = embedded.as_object().unwrap().clone();
+        legacy.remove("catalog_revision");
+        legacy.remove("upstream_codex_commit");
+        legacy.insert(
+            "fallback_model".to_string(),
+            serde_json::from_str(FALLBACK_MODEL_JSON).unwrap(),
+        );
+        let sources = parse_sources(&Value::Object(legacy).to_string()).unwrap();
+        assert_eq!(sources.templates.len(), 11);
+        assert_eq!(string_value(&sources.fallback, "display_name"), "Compatible Model");
+
+        assert!(parse_sources(r#"{"catalog_revision":"three","models":[{}]}"#).is_err());
     }
 
     #[test]

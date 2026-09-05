@@ -233,7 +233,7 @@ async function main() {
   } finally {
     try { await browser?.close(); } catch {}
     if (!exited) await killTree(child.pid);
-    if (failed && processOutput.length) {
+    if ((failed || process.env.E2E_VERBOSE) && processOutput.length) {
       console.error("[e2e] app output (tail):");
       console.error(processOutput.join("").slice(-4000));
     }
